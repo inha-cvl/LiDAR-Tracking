@@ -1,0 +1,12 @@
+<launch>
+
+  <node name="cloud_segmentation" pkg="lidar_tracking" type="cloud_segmentation" output="screen">
+    <rosparam command="load" file="$(find lidar_tracking)/config/patchworkpp_hesai.yaml" />
+  </node>
+  
+  <node name="tracking" pkg="lidar_tracking" type="tracking" output="screen">
+  </node>
+  
+  <!-- <node name="$(anon rviz)" pkg="rviz" type="rviz" args="-d $(find cloud_segmentation)/rviz/main.rviz"/> -->
+
+</launch>
