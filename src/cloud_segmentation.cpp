@@ -190,8 +190,9 @@ void ProcessLoop(std::shared_ptr<ImuProcess> p_imu)
 
         // depthClustering(nonGroundCloud, cluster_array, t6);
         downsamplingPointCloud(nonGroundCloud, downsamplingCloud, t5); // downsampling
-        // pub_downsampling_cloud.publish(cloud2msg(*downsamplingCloud, ros::Time::now(), frameID));
-        clusteringPointCloud(downsamplingCloud, cluster_array, t6); // clustering
+        pub_downsampling_cloud.publish(cloud2msg(*downsamplingCloud, ros::Time::now(), frameID));
+        adaptiveClustering(downsamplingCloud, cluster_array, t6);
+        //EuclideanClustering(downsamplingCloud, cluster_array, t6); // clustering
 
         fittingLShape(cluster_array, input_stamp, cluster_bbox_array, t7); // L shape fitting
         pub_cluster_box.publish(bba2msg(cluster_bbox_array, input_stamp, frameID)); // input_stamp

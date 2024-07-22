@@ -7,7 +7,7 @@ This is ROS package of LiDAR Tracking
 
 ## :open_file_folder: What's in this repository
 
-* ROS based LiDAR Tracking source code
+* ROS Noetic based LiDAR Tracking source code
 * Demo launch file ([demo.launch][launchlink]) with sample rosbag file. You can execute simply!
 
 [launchlink]: https://github.com/inha-cvl/LiDAR-Tracking/tree/main/launch
@@ -15,7 +15,7 @@ This is ROS package of LiDAR Tracking
 ## :package: Prerequisite packages
 You may need to install ROS, PCL, Eigen, ...
 
-## :gear: How to build Patchwork++
+## :gear: How to build LiDAR-Tracking
 To build LiDAR-Tracking, you can follow below codes.
 
 ```bash
@@ -27,7 +27,7 @@ $ catkin_make
 ## :runner: To run the demo codes
 
 ```bash
-# Start Patchwork++
+# Start Tracking
 $ roslaunch lidar_tracking demo.launch
 # Start the bag file
 $ roscore

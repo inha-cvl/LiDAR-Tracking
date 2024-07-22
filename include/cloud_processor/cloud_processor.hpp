@@ -19,7 +19,8 @@
 #include "depth_clustering/depth_cluster.h"
 
 template<typename PointT>
-sensor_msgs::PointCloud2 cloud2msg(const pcl::PointCloud<PointT>& cloud, const ros::Time& stamp, const std::string& frame_id)
+sensor_msgs::PointCloud2 cloud2msg(const pcl::PointCloud<PointT>& cloud, 
+                                    const ros::Time& stamp, const std::string& frame_id)
 {
     sensor_msgs::PointCloud2 cloud_ROS;
     pcl::toROSMsg(cloud, cloud_ROS);
@@ -28,7 +29,8 @@ sensor_msgs::PointCloud2 cloud2msg(const pcl::PointCloud<PointT>& cloud, const r
     return cloud_ROS;
 }
 
-jsk_recognition_msgs::BoundingBoxArray bba2msg(const jsk_recognition_msgs::BoundingBoxArray bba, const ros::Time& stamp, const std::string& frame_id)
+jsk_recognition_msgs::BoundingBoxArray bba2msg(const jsk_recognition_msgs::BoundingBoxArray bba, 
+                                                const ros::Time& stamp, const std::string& frame_id)
 {
     jsk_recognition_msgs::BoundingBoxArray bba_ROS;
     bba_ROS.header.stamp = stamp;
@@ -37,7 +39,8 @@ jsk_recognition_msgs::BoundingBoxArray bba2msg(const jsk_recognition_msgs::Bound
     return bba_ROS;
 }
 
-visualization_msgs::MarkerArray ta2msg(const visualization_msgs::MarkerArray& ta, const ros::Time& stamp, const std::string& frame_id)
+visualization_msgs::MarkerArray ta2msg(const visualization_msgs::MarkerArray& ta, 
+                                        const ros::Time& stamp, const std::string& frame_id)
 {
     visualization_msgs::MarkerArray ta_ROS;
     for (const auto& marker : ta.markers)
@@ -53,7 +56,8 @@ visualization_msgs::MarkerArray ta2msg(const visualization_msgs::MarkerArray& ta
 }
 
 // label에 따라 모델 다른 거 적용 예정, car 말고는 dae 파일이 없음
-visualization_msgs::MarkerArray bba2ma(const jsk_recognition_msgs::BoundingBoxArray &bba, const ros::Time& stamp, const std::string& frame_id) 
+visualization_msgs::MarkerArray bba2ma(const jsk_recognition_msgs::BoundingBoxArray &bba, 
+                                        const ros::Time& stamp, const std::string& frame_id) 
 {
     visualization_msgs::MarkerArray marker_array;
 
@@ -157,13 +161,13 @@ std::vector<cv::Point2f> pcl2Point2f(const pcl::PointCloud<pcl::PointXYZ>::Ptr &
     
     for (const auto& point : *cloud)
     {
-        // if ( (point.z < center_z + projection_range && point.z > center_z - projection_range) ||
-        //       point.z > maxPoint.z - projection_range || point.z < minPoint.z + projection_range )
-        // {
-        //     // Extract x and y coordinates from PointXYZI and create a cv::Point2f
-        //     cv::Point2f point2f(point.x, point.y);
-        //     points.push_back(point2f);
-        // }
+        if ( (point.z < center_z + projection_range && point.z > center_z - projection_range) ||
+              point.z > maxPoint.z - projection_range || point.z < minPoint.z + projection_range )
+        {
+            // Extract x and y coordinates from PointXYZI and create a cv::Point2f
+            cv::Point2f point2f(point.x, point.y);
+            points.push_back(point2f);
+        }
         cv::Point2f point2f(point.x, point.y);
         points.push_back(point2f);
     }
@@ -193,7 +197,8 @@ bool checkTransform(tf2_ros::Buffer &tf_buffer, const std::string lidar_frame, c
     }
 }
 
-void compareTransforms(const geometry_msgs::TransformStamped &transform1, const geometry_msgs::TransformStamped &transform2) 
+void compareTransforms(const geometry_msgs::TransformStamped &transform1, 
+                        const geometry_msgs::TransformStamped &transform2) 
 {
     ROS_INFO("Comparing transforms:");
 
@@ -242,7 +247,8 @@ void compareTransforms(const geometry_msgs::TransformStamped &transform1, const 
 }
 
 // hesai
-void projectPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, pcl::PointCloud<PointXYZIT>::Ptr &cloudOut, double &time_taken)
+void projectPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, 
+                        pcl::PointCloud<PointXYZIT>::Ptr &cloudOut, double &time_taken)
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -313,7 +319,8 @@ void projectPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, pcl::Poi
 }
 
 // ouster
-void projectPointCloud(const pcl::PointCloud<ouster_ros::Point>::Ptr &cloudIn, pcl::PointCloud<ouster_ros::Point>::Ptr &cloudOut, double &time_taken)
+void projectPointCloud(const pcl::PointCloud<ouster_ros::Point>::Ptr &cloudIn, 
+                        pcl::PointCloud<ouster_ros::Point>::Ptr &cloudOut, double &time_taken)
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -354,7 +361,8 @@ void projectPointCloud(const pcl::PointCloud<ouster_ros::Point>::Ptr &cloudIn, p
     time_taken = elapsed_seconds.count();
 }
 
-void cropPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn, pcl::PointCloud<PointType>::Ptr &cloudOut, double &time_taken)
+void cropPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn, 
+                    pcl::PointCloud<PointType>::Ptr &cloudOut, double &time_taken)
 {   
     auto start = std::chrono::steady_clock::now();
 
@@ -406,7 +414,8 @@ void cropPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn, pcl::PointCl
     time_taken = elapsed_seconds.count();
 }
 
-void downsamplingPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudOut, double &time_taken)
+void downsamplingPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn, 
+                            pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudOut, double &time_taken)
 {
     auto start = std::chrono::steady_clock::now();
     
@@ -422,7 +431,8 @@ void downsamplingPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn, pcl:
     time_taken = elapsed_seconds.count();
 }
 
-void clusteringPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudIn, vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &outputClusters, double &time_taken)
+void EuclideanClustering(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudIn, 
+                            vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &outputClusters, double &time_taken)
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -480,11 +490,88 @@ void clusteringPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudIn, ve
     time_taken = elapsed_seconds.count();
 }
 
-// TODO
-// 영역 별로 tolerance 다르게 해서 클러스터링 탐지 거리 늘리기
+// 개발 중,,
+void adaptiveClustering(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudIn, 
+                        std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &outputClusters, double &time_taken)
+{
+    auto start = std::chrono::high_resolution_clock::now();
 
+    if (cloudIn->points.empty()) {
+        std::cerr << "Input cloud is empty!" << std::endl;
+        return;
+    }
 
-void depthClustering(const pcl::PointCloud<PointType>::Ptr &cloudIn, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &outputClusters, double &time_taken)
+    outputClusters.clear();
+
+    // Divide the point cloud into nested circular regions
+    std::vector<float> regions(max_region, max_region / number_region); // Example: Fill regions with a distance increment of 15m each
+    boost::array<std::vector<int>, max_region> indices_array;
+
+    for (int i = 0; i < cloudIn->size(); i++) {
+        float distance = cloudIn->points[i].x * cloudIn->points[i].x + cloudIn->points[i].y * cloudIn->points[i].y;
+        float range = 0.0;
+        for (int j = 0; j < max_region; j++) {
+            if (distance > range * range && distance <= (range + regions[j]) * (range + regions[j])) {
+                indices_array[j].push_back(i);
+                break;
+            }
+            range += regions[j];
+        }
+    }
+
+    // Euclidean clustering for each region
+    float tolerance = 0.3; // Start tolerance
+    for (int i = 0; i < max_region; i++) {
+        if (indices_array[i].empty()) continue;
+
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloudSegment(new pcl::PointCloud<pcl::PointXYZ>);
+        for (int index : indices_array[i]) {
+            cloudSegment->points.push_back(cloudIn->points[index]);
+        }
+
+        pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
+        tree->setInputCloud(cloudSegment);
+
+        std::vector<pcl::PointIndices> cluster_indices;
+        pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+        ec.setClusterTolerance(tolerance + delta_tolerance * i); // Increment tolerance for farther regions
+        ec.setMinClusterSize(minSize);
+        ec.setMaxClusterSize(maxSize);
+        ec.setSearchMethod(tree);
+        ec.setInputCloud(cloudSegment);
+        ec.extract(cluster_indices);
+
+        for (auto& indices : cluster_indices) {
+            pcl::PointCloud<pcl::PointXYZ>::Ptr cluster(new pcl::PointCloud<pcl::PointXYZ>);
+            for (int idx : indices.indices) {
+                cluster->points.push_back(cloudSegment->points[idx]);
+            }
+            cluster->width = cluster->size();
+            cluster->height = 1;
+            cluster->is_dense = true;
+            
+            // // Size filterin
+            pcl::PointXYZ minPt, maxPt;
+            pcl::getMinMax3D(*cluster, minPt, maxPt);
+            double clusterSizeX = maxPt.x - minPt.x;
+            double clusterSizeY = maxPt.y - minPt.y;
+            double clusterSizeZ = maxPt.z - minPt.z;
+
+            if (clusterSizeX > minClusterSizeX && clusterSizeX < maxClusterSizeX &&
+                clusterSizeY > minClusterSizeY && clusterSizeY < maxClusterSizeY &&
+                clusterSizeZ > minClusterSizeZ && clusterSizeZ < maxClusterSizeZ) {
+                outputClusters.push_back(cluster);
+            }
+        }
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
+    time_taken = elapsed.count();
+}
+
+void depthClustering(const pcl::PointCloud<PointType>::Ptr &cloudIn, 
+                    std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &outputClusters, double &time_taken)
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -525,7 +612,6 @@ void depthClustering(const pcl::PointCloud<PointType>::Ptr &cloudIn, std::vector
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
 }
-
 
 void fittingLShape(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &inputClusters, const ros::Time &input_stamp, 
                 jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken)
@@ -624,7 +710,8 @@ void fittingPCA(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &inputClu
     time_taken = elapsed_seconds.count();
 }
 */
-void integrationBbox(const jsk_recognition_msgs::BoundingBoxArray &cluster_bbox_array, const jsk_recognition_msgs::BoundingBoxArray &deep_bbox_array, 
+void integrationBbox(const jsk_recognition_msgs::BoundingBoxArray &cluster_bbox_array, 
+                    const jsk_recognition_msgs::BoundingBoxArray &deep_bbox_array, 
                     jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken)
 {
     auto start = std::chrono::steady_clock::now();
@@ -682,7 +769,8 @@ void tracking(Track &tracker, const jsk_recognition_msgs::BoundingBoxArray &bbox
     time_taken = elapsed_seconds.count();
 }
 
-void transformBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, const std::string &frame_id, const std::string &target_frame, tf2_ros::Buffer &tf_buffer,
+void transformBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, const std::string &frame_id, 
+                    const std::string &target_frame, tf2_ros::Buffer &tf_buffer,
                    jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken)
 {
     auto start = std::chrono::high_resolution_clock::now();
