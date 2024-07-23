@@ -23,8 +23,8 @@ uprightness_thr: 0.707  # threshold of uprightness using in Ground Likelihood Es
 adaptive_seed_selection_margin: -1.2 # The points below the adaptive_seed_selection_margin * sensor_height are filtered
 czm:
     num_zones: 4
-    num_sectors_each_zone: [8, 40, 48, 24] # [16, 32, 54, 32]
-    mum_rings_each_zone: [2, 4, 4, 4]
+    num_sectors_each_zone: [8, 32, 56, 24] # [16, 32, 54, 32]
+    mum_rings_each_zone: [4, 20, 20, 20]
     elevation_thresholds:  [0.0, 0.0, 0.0, 0.0] # threshold of elevation for each ring using in GLE. Those values are updated adaptively.
     flatness_thresholds:  [0.0, 0.0, 0.0, 0.0]  # threshold of flatness for each ring using in GLE. Those values are updated adaptively.
 

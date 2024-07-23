@@ -46,6 +46,8 @@ std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer;
 double last_timestamp_imu = -1;
 std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer;
 
+std::vector<double> times_t1, times_t2, times_t3, times_t4, times_t5, times_t6, times_t7;
+/*
 void SigHandle(int sig) 
 {
     b_exit = true;
@@ -147,9 +149,6 @@ bool SyncMeasure(MeasureGroup &measgroup)
 
     return true;
 }
-
-// time check
-std::vector<double> times_t1, times_t2, times_t3, times_t4, times_t5, times_t6, times_t7;
 
 void ProcessLoop(std::shared_ptr<ImuProcess> p_imu)
 {
@@ -273,33 +272,33 @@ int main(int argc, char**argv) {
     return 0;
 
 }
+*/
 
 
-/*
-void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
+void callbackCloud2(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
 {
     input_stamp = cloud_msg->header.stamp; // ouster input_stamp
     
     pcl::fromROSMsg(*cloud_msg, *fullCloud); // topic to pcl
     
-    projectPointCloud(fullCloud, projectionCloud, t1); // projection
-    //pub_projection_cloud.publish(cloud2msg(*fullCloud, cloud_msg->header.stamp, frameID));
+    projectPointCloud(fullCloud, projectionCloud, t2); // projection
+    //pub_projection_cloud.publish(cloud2msg(*projectionCloud, ros::Time::now(), frameID));
 
     cropPointCloud(projectionCloud, cropCloud, t3); // crop
-    // pub_crop_cloud.publish(cloud2msg(*cropCloud, ros::Time::now(), frameID));
+    //pub_crop_cloud.publish(cloud2msg(*cropCloud, ros::Time::now(), frameID));
 
     PatchworkppGroundSeg->estimate_ground(*cropCloud, *groundCloud, *nonGroundCloud, t4); // ground removal
-    // pub_ground.publish(cloud2msg(*groundCloud, ros::Time::now(), frameID));
+    pub_ground.publish(cloud2msg(*groundCloud, input_stamp, frameID));
     pub_non_ground.publish(cloud2msg(*nonGroundCloud, input_stamp, frameID)); // detection 전달 때문에 input_stamp 사용
-    
-    depthClustering(nonGroundCloud, cluster_array, t6);
-    
-    //downsamplingPointCloud(nonGroundCloud, downsamplingCloud, t5); // downsampling
-    // pub_downsampling_cloud.publish(cloud2msg(*downsamplingCloud, ros::Time::now(), frameID));
-    //clusteringPointCloud(downsamplingCloud, cluster_array, t6); // clustering
-    
+
+    // depthClustering(nonGroundCloud, cluster_array, t6);
+    downsamplingPointCloud(nonGroundCloud, downsamplingCloud, t5); // downsampling
+    pub_downsampling_cloud.publish(cloud2msg(*downsamplingCloud, ros::Time::now(), frameID));
+    adaptiveClustering(downsamplingCloud, cluster_array, t6);
+    //EuclideanClustering(downsamplingCloud, cluster_array, t6); // clustering
+
     fittingLShape(cluster_array, input_stamp, cluster_bbox_array, t7); // L shape fitting
-    pub_cluster_box.publish(bba2msg(cluster_bbox_array, input_stamp, frameID));
+    pub_cluster_box.publish(bba2msg(cluster_bbox_array, input_stamp, frameID)); // input_stamp
 
     std::cout << "\033[2J" << "\033[" << 10 << ";" << 30 << "H" << std::endl;
     std::cout << "undistortion : " << t1 << " sec" << std::endl;
@@ -327,9 +326,8 @@ int main(int argc, char**argv) {
     pub_non_ground  = pnh.advertise<sensor_msgs::PointCloud2>("nonground", 1, true);
     pub_cluster_box = pnh.advertise<jsk_recognition_msgs::BoundingBoxArray>("cluster_box", 1, true);
     
-    ros::Subscriber sub_cloud = nh.subscribe(cloud_topic, 1, callbackCloud);
+    ros::Subscriber sub_cloud = nh.subscribe(cloud_topic, 1, callbackCloud2);
     
     ros::spin();
     return 0;
 }
-*/
