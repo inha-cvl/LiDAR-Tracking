@@ -177,10 +177,10 @@ void ProcessLoop(std::shared_ptr<ImuProcess> p_imu)
         p_imu->Process(meas, undistortionCloud, t1); // undistortion
         pub_undistortion_cloud.publish(cloud2msg(*undistortionCloud, input_stamp, frameID));
 
-        projectPointCloud(undistortionCloud, projectionCloud, t2); // projection
+        // projectPointCloud(undistortionCloud, projectionCloud, t2); // projection
         //pub_projection_cloud.publish(cloud2msg(*projectionCloud, ros::Time::now(), frameID));
 
-        cropPointCloud(projectionCloud, cropCloud, t3); // crop
+        cropPointCloud(undistortionCloud, cropCloud, t3); // crop
         //pub_crop_cloud.publish(cloud2msg(*cropCloud, ros::Time::now(), frameID));
 
         PatchworkppGroundSeg->estimate_ground(*cropCloud, *groundCloud, *nonGroundCloud, t4); // ground removal
@@ -194,6 +194,7 @@ void ProcessLoop(std::shared_ptr<ImuProcess> p_imu)
         //EuclideanClustering(downsamplingCloud, cluster_array, t6); // clustering
 
         fittingLShape(cluster_array, input_stamp, cluster_bbox_array, t7); // L shape fitting
+        //fittingPCA(cluster_array, input_stamp, cluster_bbox_array, t7);
         pub_cluster_box.publish(bba2msg(cluster_bbox_array, input_stamp, frameID)); // input_stamp
 
         std::cout << "\033[2J" << "\033[" << 10 << ";" << 30 << "H" << std::endl;

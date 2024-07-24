@@ -246,7 +246,7 @@ void compareTransforms(const geometry_msgs::TransformStamped &transform1,
     }
 }
 
-// hesai
+// Pandar64
 void projectPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, 
                         pcl::PointCloud<PointXYZIT>::Ptr &cloudOut, double &time_taken)
 {
@@ -258,9 +258,6 @@ void projectPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn,
     float verticalAngle, horizonAngle;
     size_t rowIdn, columnIdn, index;
     PointXYZIT outPoint;
-
-    int32_t sec = static_cast<int32_t>(cloudIn->points.begin()->timestamp);
-    int32_t nsec = static_cast<int32_t>((cloudIn->points.begin()->timestamp - sec) * 1e9);
     
     for (const auto& inPoint : cloudIn->points)
     {   
@@ -369,10 +366,6 @@ void cropPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn,
     cloudOut->clear();
     cloudOut->reserve(cloudIn->size());
 
-    // Degree
-    double min_angle_rad = -40 * M_PI / 180.0;
-    double max_angle_rad = 40 * M_PI / 180.0;
-
     for (auto it = cloudIn->begin(); it != cloudIn->end(); ++it)
     {
         const PointType& point = *it;
@@ -393,6 +386,8 @@ void cropPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn,
         }
 
         // Degree
+        // double min_angle_rad = -40 * M_PI / 180.0;
+        // double max_angle_rad = 40 * M_PI / 180.0;
         // double angle = std::atan2(point.y, point.x);
         // if (angle >= min_angle_rad && angle <= max_angle_rad)
         // {
@@ -665,7 +660,7 @@ void fittingLShape(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &input
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
 }
-/* // L-shape Fitting 과 비교용
+// L-shape Fitting 과 비교용
 #include <pcl/common/pca.h>
 void fittingPCA(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &inputClusters, const ros::Time &input_stamp, 
                 jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken)
@@ -680,11 +675,10 @@ void fittingPCA(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &inputClu
         pcl::PointXYZ minPoint, maxPoint;
         pcl::getMinMax3D(*cluster, minPoint, maxPoint);
 
-        pca.setInputCloud(cluster);
-        
         // Find the oriented bounding box
-        Eigen::Vector3f eigen_values = pca.getEigenValues();
-        Eigen::Matrix3f eigen_vectors = pca.getEigenVectors();
+        // pca.setInputCloud(cluster);
+        // Eigen::Vector3f eigen_values = pca.getEigenValues();
+        // Eigen::Matrix3f eigen_vectors = pca.getEigenVectors();
 
         // Create jsk_recognition_msgs::BoundingBox
         jsk_recognition_msgs::BoundingBox bbox;
@@ -696,11 +690,15 @@ void fittingPCA(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &inputClu
         bbox.dimensions.x = maxPoint.x - minPoint.x;
         bbox.dimensions.y = maxPoint.y - minPoint.y;
         bbox.dimensions.z = maxPoint.z - minPoint.z;
-        Eigen::Quaternionf quat(eigen_vectors);
-        //bbox.pose.orientation.x = quat.x();
-        //bbox.pose.orientation.y = quat.y();
-        bbox.pose.orientation.z = quat.z();
-        bbox.pose.orientation.w = quat.w();
+        // Eigen::Quaternionf quat(eigen_vectors);
+        // bbox.pose.orientation.x = quat.x();
+        // bbox.pose.orientation.y = quat.y();
+        // bbox.pose.orientation.z = quat.z();
+        // bbox.pose.orientation.w = quat.w();
+        bbox.pose.orientation.x = 0;
+        bbox.pose.orientation.y = 0;
+        bbox.pose.orientation.z = 0;
+        bbox.pose.orientation.w = 1;
 
         output_bbox_array.boxes.push_back(bbox);
     }
@@ -709,7 +707,7 @@ void fittingPCA(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &inputClu
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
 }
-*/
+
 void integrationBbox(const jsk_recognition_msgs::BoundingBoxArray &cluster_bbox_array, 
                     const jsk_recognition_msgs::BoundingBoxArray &deep_bbox_array, 
                     jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken)

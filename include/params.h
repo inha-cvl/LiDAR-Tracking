@@ -2,7 +2,7 @@
 #include "point_type/os_point.h"
 #include "point_type/hesai_point.h"
 
-// Pandar64
+// Hesai 
 // int V_SCAN = 64;
 // int H_SCAN = 1800;
 // float ang_res_x = 360.0 / float(H_SCAN);
@@ -11,7 +11,7 @@
 // using PointType = PointXYZIT;
 // std::string cloud_topic = "/hesai/pandar";
 // std::string imu_topic = "imu/data_raw"; // novatel
-// std::string frameID = "Pandar64";
+// std::string frameID = "Pandar64"; // Pandar64 or OT128
 // std::string target_frame = "ego_car";
 // std::string world_frame = "world";
 // // downsampling
@@ -58,7 +58,7 @@ std::string world_frame = "world";
 // downsampling
 float leaf_size_x = 0.1f;
 float leaf_size_y = 0.1f;
-float leaf_size_z = 0.05f;
+float leaf_size_z = 0.1f;
 // Filtering Cluster
 float minClusterSizeX = 0.1;
 float maxClusterSizeX = 10;
@@ -67,7 +67,7 @@ float maxClusterSizeY = 10;
 float minClusterSizeZ = 0.05;
 float maxClusterSizeZ = 3;
 // Euclidean Clustering
-float clusterTolerance = 0.3;
+float clusterTolerance = 1.0;
 int minSize = 3;
 int maxSize = 2000;
 // Depth Clustering
@@ -76,9 +76,9 @@ float horizontal_resolution = 1.2f; // 가상의 수평 해상도
 int lidar_lines = 128; // LiDAR 라인 수
 int cluster_size = 3; // 최소 클러스터 크기
 // Adaptive Clustering
-float start_tolerance = 0.5;
+float start_tolerance = 0.6;
 float delta_tolerance = 0.04;
-const int max_region = 150;
+const int max_region = 50;
 const int number_region = 10;
 float threshIOU = 0.1; // clustering and integration
 // L shape fitting
@@ -96,10 +96,10 @@ float projection_range = 0.2; // *2
 // std::string frameID = "sensor1/os_sensor";
 
 // ROI
-float MAX_X = 100;
-float MIN_X = -100;
-float MAX_Y = 100;
-float MIN_Y = -100;
+float MAX_X = 70;
+float MIN_X = -70;
+float MAX_Y = 50;
+float MIN_Y = -50;
 float MAX_Z = 0.7;
 float MIN_Z = -2.5; // -1.4
 float max_x = 2;
