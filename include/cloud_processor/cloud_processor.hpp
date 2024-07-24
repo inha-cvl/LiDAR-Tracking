@@ -386,8 +386,8 @@ void cropPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn,
 
         // Rectangle
         if (point.x >= MIN_X && point.x <= MAX_X &&
-            point.y >= MIN_Y && point.y <= MAX_Y &&
-            point.z >= MIN_Z && point.z <= MAX_Z)
+            point.y >= MIN_Y && point.y <= MAX_Y) //&&
+            // point.z >= MIN_Z && point.z <= MAX_Z)
         {
             cloudOut->push_back(point);
         }

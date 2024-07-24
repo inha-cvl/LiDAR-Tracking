@@ -47,7 +47,7 @@ double last_timestamp_imu = -1;
 std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer;
 
 std::vector<double> times_t1, times_t2, times_t3, times_t4, times_t5, times_t6, times_t7;
-/*
+
 void SigHandle(int sig) 
 {
     b_exit = true;
@@ -184,7 +184,7 @@ void ProcessLoop(std::shared_ptr<ImuProcess> p_imu)
         //pub_crop_cloud.publish(cloud2msg(*cropCloud, ros::Time::now(), frameID));
 
         PatchworkppGroundSeg->estimate_ground(*cropCloud, *groundCloud, *nonGroundCloud, t4); // ground removal
-        //pub_ground.publish(cloud2msg(*groundCloud, input_stamp, frameID));
+        pub_ground.publish(cloud2msg(*groundCloud, input_stamp, frameID));
         pub_non_ground.publish(cloud2msg(*nonGroundCloud, input_stamp, frameID)); // detection 전달 때문에 input_stamp 사용
 
         // depthClustering(nonGroundCloud, cluster_array, t6);
@@ -272,9 +272,9 @@ int main(int argc, char**argv) {
     return 0;
 
 }
-*/
 
 
+/*
 void callbackCloud2(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
 {
     input_stamp = cloud_msg->header.stamp; // ouster input_stamp
@@ -331,3 +331,4 @@ int main(int argc, char**argv) {
     ros::spin();
     return 0;
 }
+*/
