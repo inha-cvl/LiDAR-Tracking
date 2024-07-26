@@ -19,7 +19,7 @@ void DepthCluster::initParams() {
     image_cols_ = int(360.0/horizontal_resolution_);
     image_rows_ = lidar_lines_;
 
-    if (frameID == "Pandar64") {
+    if (frameID == "hesai_lidar") {
         vertical_angle_min_ = -25.0;
         vertical_angle_max_ = 15.0;
     }

@@ -1,7 +1,7 @@
 <launch>
 
   <node name="cloud_segmentation" pkg="lidar_tracking" type="cloud_segmentation" output="screen">
-    <rosparam command="load" file="$(find lidar_tracking)/config/patchworkpp_ouster.yaml" />
+    <rosparam command="load" file="$(find lidar_tracking)/config/patchworkpp_hesai.yaml" />
   </node>
   
   <node name="tracking" pkg="lidar_tracking" type="tracking" output="screen">

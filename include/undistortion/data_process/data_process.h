@@ -39,7 +39,14 @@ class ImuProcess {
 
   void UndistortPcl(const pcl::PointCloud<PointXYZIT>::Ptr &pcl_in_out, double dt_be, const Sophus::SE3d &Tbe);
   void UndistortPcl(const pcl::PointCloud<ouster_ros::Point>::Ptr &pcl_in_out, double dt_be, const Sophus::SE3d &Tbe);
-  
+
+/*
+  void undistortPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn,
+                                     const ros::Time time_stamp,
+                                     const std::deque<sensor_msgs::Imu::ConstPtr> &imu_buffer,
+                                     pcl::PointCloud<PointXYZIT>::Ptr &cloudOut,
+                                     double &time_taken);
+*/
 
  private:
   /// Whether is the first frame, init for first frame
