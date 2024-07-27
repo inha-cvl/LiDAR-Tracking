@@ -15,9 +15,9 @@ std::string frameID = "hesai_lidar"; // Pandar64 or OT128
 std::string target_frame = "ego_car";
 std::string world_frame = "world";
 // downsampling
-float leaf_size_x = 0.2f;
-float leaf_size_y = 0.2f;
-float leaf_size_z = 0.2f;
+float leaf_size_x = 0.3f;
+float leaf_size_y = 0.3f;
+float leaf_size_z = 0.3f;
 // Filtering Cluster
 float minClusterSizeX = 0.2;
 float maxClusterSizeX = 13;
@@ -99,7 +99,7 @@ float projection_range = 0.2; // *2
 float MAX_X = 10;
 float MIN_X = -10;
 float MAX_Y = 5;
-float MIN_Y = -120;
+float MIN_Y = -80;
 float MAX_Z = 0.7;
 float MIN_Z = -1.86; // -1.4
 float max_x = 2;

@@ -366,9 +366,12 @@ void cropPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn,
     cloudOut->clear();
     cloudOut->reserve(cloudIn->size());
 
-    for (auto it = cloudIn->begin(); it != cloudIn->end(); ++it)
+    for (const auto& inPoint : cloudIn->points)
     {
-        const PointType& point = *it;
+        const PointType& point = inPoint;
+
+        // ring filtering
+        //if (point.ring % 2 == 0) { continue; }
 
         // Car exclusion
         if (point.x >= min_x && point.x <= max_x &&
@@ -807,7 +810,6 @@ void transformBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_arra
     time_taken = elapsed_seconds.count();
 }
 
-// 개발중,,
 void correctionBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, const ros::Time &input_stamp, 
                     const std::string target_frame, const std::string world_frame, tf2_ros::Buffer &tf_buffer,
                     jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken)
@@ -861,33 +863,42 @@ void correctionBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_arr
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
 }
-
-void undistortPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn,
-                        const ros::Time time_stamp,
-                        const std::deque<sensor_msgs::Imu::ConstPtr> &imu_buffer,
-                        pcl::PointCloud<PointXYZIT>::Ptr &cloudOut,
-                        double &time_taken)
+// 개발중,,
+Eigen::Quaterniond calculateRotationBetweenStamps(const std::deque<sensor_msgs::Imu::ConstPtr>& imu_buffer,
+                                                const ros::Time& last_stamp, const ros::Time& input_stamp) 
 {
-    auto start_time = std::chrono::steady_clock::now();
 
-    double start_time_sec = time_stamp.toSec();
-    double end_time_sec = start_time_sec + 0.1;  // 0.1 seconds later
+    Eigen::Quaterniond rotation_increment = Eigen::Quaterniond::Identity();
 
-    // Initialize the final rotation as an identity quaternion
-    Eigen::Quaterniond final_rotation(1, 0, 0, 0);
-
-    // Accumulate rotation from IMU data
-    for (const auto &imu : imu_buffer) {
-        double imu_time = imu->header.stamp.toSec();
-        if (imu_time >= start_time_sec && imu_time <= end_time_sec) {
-            Eigen::Quaterniond imu_rotation(1.0, imu->orientation.x,
-                                            imu->orientation.y, imu->orientation.z);
-            final_rotation = imu_rotation * final_rotation;  // Order matters in quaternion multiplication
+    for (const auto& imu : imu_buffer) {
+        ros::Time imu_time = imu->header.stamp;
+        if (imu_time > last_stamp && imu_time <= input_stamp) {
+            auto it = std::find(imu_buffer.begin(), imu_buffer.end(), imu);
+            if (it != imu_buffer.begin()) {
+                auto prev_it = std::prev(it);
+                double dt = (imu_time - (*prev_it)->header.stamp).toSec();
+                Eigen::Vector3d angular_velocity(imu->angular_velocity.x,
+                                                 imu->angular_velocity.y,
+                                                 imu->angular_velocity.z);
+                Eigen::Quaterniond delta_rotation(
+                    Eigen::AngleAxisd(angular_velocity.norm() * dt, angular_velocity.normalized())
+                );
+                rotation_increment = delta_rotation * rotation_increment; // 순서가 중요
+            }
         }
     }
 
-    // Convert final rotation to SO3 for easier manipulation
-    Sophus::SO3d final_so3(final_rotation);
+    return rotation_increment;
+}
+
+void undistortPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn, const Eigen::Quaterniond &rotation,
+                        pcl::PointCloud<PointType>::Ptr &cloudOut, double &time_taken)
+{
+    auto start_time = std::chrono::steady_clock::now();
+
+    // Convert the quaternion to SO3 for easier manipulation and calculate its inverse
+    Sophus::SO3d final_so3(rotation);
+    Sophus::SO3d inverse_so3 = final_so3.inverse();
 
     // Process each point in the cloud
     cloudOut->points.resize(cloudIn->points.size());
@@ -897,18 +908,10 @@ void undistortPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn,
 
     for (size_t i = 0; i < cloudIn->points.size(); ++i) {
         const auto &pt = cloudIn->points[i];
-        double point_time = pt.timestamp;  // Assume pt.timestamp is in nanoseconds
-
-        // Calculate the ratio of time elapsed for each point
-        double duration = end_time_sec - start_time_sec;
-        double time_ratio = (point_time - start_time_sec) / duration;
-
-        // Calculate the rotation for the current point
-        Sophus::SO3d point_rotation = Sophus::SO3d::exp(time_ratio * final_so3.log());
-
-        // Apply the rotation
+        
+        // Apply the inverse rotation
         Eigen::Vector3d pt_vec(pt.x, pt.y, pt.z);
-        Eigen::Vector3d rotated_pt = point_rotation * pt_vec;
+        Eigen::Vector3d rotated_pt = inverse_so3 * pt_vec;
 
         PointXYZIT new_point;
         new_point.x = rotated_pt.x();
@@ -921,3 +924,4 @@ void undistortPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn,
     std::chrono::duration<double> elapsed_seconds = end_time - start_time;
     time_taken = elapsed_seconds.count();
 }
+
