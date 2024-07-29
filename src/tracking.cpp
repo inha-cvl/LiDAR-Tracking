@@ -42,12 +42,12 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
     
     total = ros::Time::now().toSec() - cluster_bbox_array.boxes[0].header.stamp.toSec();
 
-    // std::cout << "\033[" << 17 << ";" << 30 << "H" << std::endl;
-    // std::cout << "integration : " << t8 << "sec" << std::endl;
-    // std::cout << "tracking : " << t9 << "sec" << std::endl;
-    // std::cout << "transform & correction : " << t10+t11 << "sec" << std::endl;
-    // std::cout << "total : " << total << " sec" << std::endl;
-    // std::cout << "fixed frame : " << fixed_frame << std::endl;
+    std::cout << "\033[" << 17 << ";" << 30 << "H" << std::endl;
+    std::cout << "integration : " << t8 << "sec" << std::endl;
+    std::cout << "tracking : " << t9 << "sec" << std::endl;
+    std::cout << "transform & correction : " << t10+t11 << "sec" << std::endl;
+    std::cout << "total : " << total << " sec" << std::endl;
+    std::cout << "fixed frame : " << fixed_frame << std::endl;
 }
 
 void callbackDeep(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)

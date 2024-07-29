@@ -16,9 +16,12 @@ pcl::PointCloud<PointType>::Ptr groundCloud(new pcl::PointCloud<PointType>);
 pcl::PointCloud<PointType>::Ptr nonGroundCloud(new pcl::PointCloud<PointType>);
 pcl::PointCloud<pcl::PointXYZ>::Ptr downsamplingCloud(new pcl::PointCloud<pcl::PointXYZ>);
 
+cv::Mat projectionImage;
+
 pcl::PointCloud<PointType>::Ptr testCloud(new pcl::PointCloud<PointType>);
 
 ros::Publisher pub_undistortion_cloud;
+ros::Publisher pub_projection_image;
 ros::Publisher pub_projection_cloud;
 ros::Publisher pub_crop_cloud;
 ros::Publisher pub_downsampling_cloud;
@@ -70,28 +73,31 @@ void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
     input_stamp = cloud_msg->header.stamp; // input_stamp
     
     pcl::fromROSMsg(*cloud_msg, *fullCloud); // topic to pcl
-
-    // projectPointCloud(fullCloud, projectionCloud, t2); // projection
+    
+    projectPointCloud(fullCloud, projectionCloud, t2); // projection
     // pub_projection_cloud.publish(cloud2msg(*projectionCloud, ros::Time::now(), frameID));
+    
+    convertPointCloudToImage(projectionCloud, projectionImage);
+    pub_projection_image.publish(image2msg(projectionImage, ros::Time::now(), frameID));
 
-    undistortPointCloud(fullCloud, rotation, undistortionCloud, t1);
-    pub_undistortion_cloud.publish(cloud2msg(*undistortionCloud, input_stamp, frameID));
+    // cropPointCloud(fullCloud, cropCloud, t3); // crop
+    // //pub_crop_cloud.publish(cloud2msg(*cropCloud, ros::Time::now(), frameID));
 
-    cropPointCloud(undistortionCloud, cropCloud, t3); // crop
-    //pub_crop_cloud.publish(cloud2msg(*cropCloud, ros::Time::now(), frameID));
+    // PatchworkppGroundSeg->estimate_ground(*cropCloud, *groundCloud, *nonGroundCloud, t4); // ground removal
+    // // pub_ground.publish(cloud2msg(*groundCloud, input_stamp, frameID));
+    // pub_non_ground.publish(cloud2msg(*nonGroundCloud, input_stamp, frameID)); // detection 전달 때문에 input_stamp 사용
 
-    PatchworkppGroundSeg->estimate_ground(*cropCloud, *groundCloud, *nonGroundCloud, t4); // ground removal
-    // pub_ground.publish(cloud2msg(*groundCloud, input_stamp, frameID));
-    pub_non_ground.publish(cloud2msg(*nonGroundCloud, input_stamp, frameID)); // detection 전달 때문에 input_stamp 사용
+    // undistortPointCloud(nonGroundCloud, rotation, undistortionCloud, t1);
+    // // pub_undistortion_cloud.publish(cloud2msg(*undistortionCloud, input_stamp, frameID));
 
-    // depthClustering(nonGroundCloud, cluster_array, t6);
-    downsamplingPointCloud(nonGroundCloud, downsamplingCloud, t5); // downsampling
-    // pub_downsampling_cloud.publish(cloud2msg(*downsamplingCloud, ros::Time::now(), frameID));
-    adaptiveClustering(downsamplingCloud, cluster_array, t6);
-    //EuclideanClustering(downsamplingCloud, cluster_array, t6); // clustering
+    // // depthClustering(nonGroundCloud, cluster_array, t6);
+    // downsamplingPointCloud(undistortionCloud, downsamplingCloud, t5); // downsampling
+    // // pub_downsampling_cloud.publish(cloud2msg(*downsamplingCloud, ros::Time::now(), frameID));
+    // adaptiveClustering(downsamplingCloud, cluster_array, t6);
+    // //EuclideanClustering(downsamplingCloud, cluster_array, t6); // clustering
 
-    fittingLShape(cluster_array, input_stamp, cluster_bbox_array, t7); // L shape fitting
-    pub_cluster_box.publish(bba2msg(cluster_bbox_array, input_stamp, frameID)); // input_stamp
+    // fittingLShape(cluster_array, input_stamp, cluster_bbox_array, t7); // L shape fitting
+    // pub_cluster_box.publish(bba2msg(cluster_bbox_array, input_stamp, frameID)); // input_stamp
 
     std::cout << "\033[2J" << "\033[" << 10 << ";" << 30 << "H" << std::endl;
     std::cout << "undistortion : " << t1 << " sec" << std::endl;
@@ -111,7 +117,8 @@ int main(int argc, char**argv) {
     cout << "Operating cloud segementation..." << endl;
     PatchworkppGroundSeg.reset(new PatchWorkpp<PointType>(&pnh));
 
-    pub_undistortion_cloud = pnh.advertise<sensor_msgs::PointCloud2>("undistortioncloud", 1, true); 
+    pub_undistortion_cloud = pnh.advertise<sensor_msgs::PointCloud2>("undistortioncloud", 1, true);
+    pub_projection_image = nh.advertise<sensor_msgs::Image>("projected_image", 1, true);
     pub_projection_cloud  = pnh.advertise<sensor_msgs::PointCloud2>("fullcloud", 1, true);
     pub_crop_cloud  = pnh.advertise<sensor_msgs::PointCloud2>("cropcloud", 1, true);
     pub_downsampling_cloud  = pnh.advertise<sensor_msgs::PointCloud2>("clusteringcloud", 1, true);

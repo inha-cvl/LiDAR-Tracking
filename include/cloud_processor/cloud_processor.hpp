@@ -1,5 +1,6 @@
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/Image.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <tf2_eigen/tf2_eigen.h>
 #include <tf2_ros/transform_listener.h>
@@ -10,6 +11,9 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl_conversions/pcl_conversions.h>
+
+#include <cv_bridge/cv_bridge.h>
+#include <opencv2/opencv.hpp>
 
 #include "params.h"
 #include "undistortion/data_process/data_process.h"
@@ -27,6 +31,16 @@ sensor_msgs::PointCloud2 cloud2msg(const pcl::PointCloud<PointT>& cloud,
     cloud_ROS.header.stamp = stamp;
     cloud_ROS.header.frame_id = frame_id;
     return cloud_ROS;
+}
+
+sensor_msgs::ImagePtr image2msg(const cv::Mat& image, const ros::Time& stamp, const std::string& frame_id)
+{
+    cv_bridge::CvImage cv_image;
+    cv_image.header.stamp = stamp; 
+    cv_image.header.frame_id = frame_id;
+    cv_image.encoding = "mono8"; 
+    cv_image.image = image;
+    return cv_image.toImageMsg();
 }
 
 jsk_recognition_msgs::BoundingBoxArray bba2msg(const jsk_recognition_msgs::BoundingBoxArray bba, 
@@ -66,7 +80,7 @@ visualization_msgs::MarkerArray bba2ma(const jsk_recognition_msgs::BoundingBoxAr
         
         visualization_msgs::Marker marker;
         marker.header.frame_id = frame_id;
-        marker.lifetime = ros::Duration(0.2);
+        marker.lifetime = ros::Duration(0.1);
         marker.header.stamp = stamp;
         marker.ns = "model";
         marker.id = i;
@@ -78,13 +92,13 @@ visualization_msgs::MarkerArray bba2ma(const jsk_recognition_msgs::BoundingBoxAr
         {
             marker.type = visualization_msgs::Marker::MESH_RESOURCE;
             marker.mesh_resource = "package://lidar_tracking/urdf/car.dae";
-            marker.scale.x = 1.6;
-            marker.scale.y = 2.2;
-            marker.scale.z = 1.4;
+            marker.scale.x = 1.7;
+            marker.scale.y = 2.1;
+            marker.scale.z = 1.6;
             marker.color.r = 0.5;
             marker.color.g = 0.5;
             marker.color.b = 0.5;
-            marker.color.a = 1.0;
+            marker.color.a = 2.0;
         }
         else if (bbox.label == 2)
         {
@@ -247,6 +261,7 @@ void compareTransforms(const geometry_msgs::TransformStamped &transform1,
 }
 
 // hesai
+/*
 void projectPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, 
                         pcl::PointCloud<PointXYZIT>::Ptr &cloudOut, double &time_taken)
 {
@@ -314,6 +329,71 @@ void projectPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn,
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
 }
+*/
+
+void projectPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, 
+                        pcl::PointCloud<PointXYZIT>::Ptr &cloudOut, double &time_taken)
+{
+    auto start = std::chrono::steady_clock::now();
+
+    cloudOut->clear();
+    cloudOut->points.resize(V_SCAN * H_SCAN);
+
+    float verticalAngle, horizonAngle;
+    size_t rowIdn, columnIdn, index;
+    
+    for (const auto& inPoint : cloudIn->points)
+    {   
+        verticalAngle = atan2(inPoint.z, sqrt(inPoint.x * inPoint.x + inPoint.y * inPoint.y)) * 180 / M_PI;
+
+        if (verticalAngle >= 0.125) {
+            rowIdn = 24 + (int)((verticalAngle - 0.125) / 0.125); // Channel 24 to 89
+        } else if (verticalAngle >= -0.25) {
+            rowIdn = 8 + (int)((verticalAngle + 0.25) / 0.36); // Channel 8 to 24, 89 to 121
+        } else if (verticalAngle >= -1.2) {
+            rowIdn = 4 + (int)((verticalAngle + 1.2) / 0.67); // Channel 4 to 8, 121 to 125
+        } else {
+            rowIdn = (int)((verticalAngle + 2.4) / 1.2); // Channel 1 to 4, 125 to 128
+        }
+
+        if (rowIdn < 0 || rowIdn >= V_SCAN)
+            continue;
+
+        horizonAngle = atan2(inPoint.x, inPoint.y) * 180 / M_PI;
+        columnIdn = -round((horizonAngle - 90.0) / ang_res_x) + H_SCAN / 2;
+
+        if (columnIdn >= H_SCAN)
+            columnIdn -= H_SCAN;
+
+        if (columnIdn < 0 || columnIdn >= H_SCAN)
+            continue;
+
+        index = columnIdn + rowIdn * H_SCAN;
+
+        cloudOut->points[index] = inPoint;
+    }
+    
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end - start;
+    time_taken = elapsed_seconds.count();
+}
+
+void convertPointCloudToImage(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, cv::Mat &imageOut)
+{
+    imageOut = cv::Mat::zeros(V_SCAN, H_SCAN, CV_8UC1);
+
+    for (int i = 0; i < V_SCAN; ++i)
+    {
+        for (int j = 0; j < H_SCAN; ++j)
+        {
+            int index = i * H_SCAN + j;
+            if (!std::isnan(cloudIn->points[index].intensity))
+            {
+                imageOut.at<uchar>(i, j) = static_cast<uchar>(cloudIn->points[index].intensity);
+            }
+        }
+    }
+}
 
 // ouster
 void projectPointCloud(const pcl::PointCloud<ouster_ros::Point>::Ptr &cloudIn, 
@@ -371,14 +451,11 @@ void cropPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn,
         const PointType& point = inPoint;
 
         // ring filtering
-        //if (point.ring % 2 == 0) { continue; }
-
+        if (crop_ring == true) { if (point.ring % ring == 0) { continue; } }
+        
         // Car exclusion
         if (point.x >= min_x && point.x <= max_x &&
-            point.y >= min_y && point.y <= max_y)
-        {
-            continue;
-        }
+            point.y >= min_y && point.y <= max_y) { continue; }
 
         // Rectangle
         if (point.x >= MIN_X && point.x <= MAX_X &&
@@ -914,6 +991,7 @@ void undistortPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn, const E
         Eigen::Vector3d rotated_pt = inverse_so3 * pt_vec;
 
         PointXYZIT new_point;
+        new_point = pt;
         new_point.x = rotated_pt.x();
         new_point.y = rotated_pt.y();
         new_point.z = rotated_pt.z();
