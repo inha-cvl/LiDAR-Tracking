@@ -15,7 +15,7 @@ std::string frameID = "hesai_lidar"; //
 std::string target_frame = "ego_car";
 std::string world_frame = "world";
 // ring crop
-bool crop_ring = true;
+bool crop_ring = false;
 uint16_t ring = 2; // if (point.ring % ring == 0)
 // downsampling
 float leaf_size_x = 0.3f;
@@ -99,12 +99,12 @@ float projection_range = 0.2; // *2
 // std::string frameID = "sensor1/os_sensor";
 
 // ROI
-float MAX_X = 4;
-float MIN_X = -4;
+float MAX_X = 100;
+float MIN_X = 0;
 float MAX_Y = 5;
-float MIN_Y = -100;
-float MAX_Z = 0.7;
-float MIN_Z = -1.86; // -1.4
+float MIN_Y = -5;
+float MAX_Z = -1.1;
+float MIN_Z = -2.0; // -1.4
 float max_x = 2;
 float min_x = -2;
 float max_y = 0.8;
