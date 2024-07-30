@@ -346,14 +346,16 @@ void projectPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn,
     {   
         verticalAngle = atan2(inPoint.z, sqrt(inPoint.x * inPoint.x + inPoint.y * inPoint.y)) * 180 / M_PI;
 
-        if (verticalAngle >= 0.125) {
-            rowIdn = 24 + (int)((verticalAngle - 0.125) / 0.125); // Channel 24 to 89
-        } else if (verticalAngle >= -0.25) {
-            rowIdn = 8 + (int)((verticalAngle + 0.25) / 0.36); // Channel 8 to 24, 89 to 121
-        } else if (verticalAngle >= -1.2) {
-            rowIdn = 4 + (int)((verticalAngle + 1.2) / 0.67); // Channel 4 to 8, 121 to 125
+        if (verticalAngle >= -25 && verticalAngle < -14) {
+            rowIdn = (verticalAngle + 25) / 1.2;
+        } else if (verticalAngle < -6) {
+            rowIdn = 4 + (verticalAngle + 14) / 0.67;
+        } else if (verticalAngle < -0.25) {
+            rowIdn = 8 + (verticalAngle + 6) / 0.36;
+        } else if (verticalAngle < 15) {
+            rowIdn = 24 + (verticalAngle + 0.25) / 0.125;
         } else {
-            rowIdn = (int)((verticalAngle + 2.4) / 1.2); // Channel 1 to 4, 125 to 128
+            continue;
         }
 
         if (rowIdn < 0 || rowIdn >= V_SCAN)
@@ -380,19 +382,24 @@ void projectPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn,
 
 void convertPointCloudToImage(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, cv::Mat &imageOut)
 {
-    imageOut = cv::Mat::zeros(V_SCAN, H_SCAN, CV_8UC1);
+    cv::Mat temp_image = cv::Mat::zeros(V_SCAN, H_SCAN, CV_8UC1);
 
     for (int i = 0; i < V_SCAN; ++i)
     {
+        int reversed_i = V_SCAN - 1 - i;  // 수직 인덱스를 반대로 계산하여 상하 반전
         for (int j = 0; j < H_SCAN; ++j)
         {
+            int reversed_j = H_SCAN - 1 - j;  // 수평 인덱스를 반대로 계산하여 좌우 반전
             int index = i * H_SCAN + j;
             if (!std::isnan(cloudIn->points[index].intensity))
             {
-                imageOut.at<uchar>(i, j) = static_cast<uchar>(cloudIn->points[index].intensity);
+                temp_image.at<uchar>(reversed_i, reversed_j) = static_cast<uchar>(cloudIn->points[index].intensity);
             }
         }
     }
+
+    // Apply histogram equalization to enhance the image contrast
+    cv::equalizeHist(temp_image, imageOut);
 }
 
 // ouster
@@ -451,7 +458,9 @@ void cropPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn,
         const PointType& point = inPoint;
 
         // ring filtering
-        if (crop_ring == true) { if (point.ring % ring == 0) { continue; } }
+        if (crop_ring == true && point.ring % ring == 0) { continue; }
+        // intensity filtering
+        if (crop_intensity == true && point.intensity < intensity) { continue; }
         
         // Car exclusion
         if (point.x >= min_x && point.x <= max_x &&
