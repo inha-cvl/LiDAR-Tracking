@@ -74,20 +74,20 @@ void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
     
     pcl::fromROSMsg(*cloud_msg, *fullCloud); // topic to pcl
     
-    projectPointCloud(fullCloud, projectionCloud, t2); // projection
-    pub_projection_cloud.publish(cloud2msg(*projectionCloud, ros::Time::now(), frameID));
-    convertPointCloudToImage(projectionCloud, projectionImage);
-    pub_projection_image.publish(image2msg(projectionImage, ros::Time::now(), frameID));
+    // projectPointCloud(fullCloud, projectionCloud, t2); // projection
+    // pub_projection_cloud.publish(cloud2msg(*projectionCloud, ros::Time::now(), frameID));
+    // convertPointCloudToImage(projectionCloud, projectionImage);
+    // pub_projection_image.publish(image2msg(projectionImage, ros::Time::now(), frameID));
 
     cropPointCloud(fullCloud, cropCloud, t3); // crop
     //pub_crop_cloud.publish(cloud2msg(*cropCloud, ros::Time::now(), frameID));
 
     PatchworkppGroundSeg->estimate_ground(*cropCloud, *groundCloud, *nonGroundCloud, t4); // ground removal
     // pub_ground.publish(cloud2msg(*groundCloud, input_stamp, frameID));
-    pub_non_ground.publish(cloud2msg(*nonGroundCloud, input_stamp, frameID)); // detection 전달 때문에 input_stamp 사용
+    // pub_non_ground.publish(cloud2msg(*nonGroundCloud, input_stamp, frameID)); // detection 전달 때문에 input_stamp 사용
 
     undistortPointCloud(nonGroundCloud, rotation, undistortionCloud, t1);
-    // pub_undistortion_cloud.publish(cloud2msg(*undistortionCloud, input_stamp, frameID));
+    pub_undistortion_cloud.publish(cloud2msg(*undistortionCloud, input_stamp, frameID));
 
     // depthClustering(nonGroundCloud, cluster_array, t6);
     downsamplingPointCloud(undistortionCloud, downsamplingCloud, t5); // downsampling

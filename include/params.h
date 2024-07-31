@@ -33,7 +33,7 @@ float minClusterSizeZ = 0.3; // 0.3
 float maxClusterSizeZ = 1.5;
 // Euclidean Clustering
 float clusterTolerance = 0.3; // 더 올리면 전방 차량 클러스터링 못 함
-int minSize = 3;
+int minSize = 10;
 int maxSize = 2000; // hesai 기준으로 이 정도는 해야 버스 인식
 // Depth Clustering
 float vertical_resolution = 5.0f; // 가상의 수직 해상도
@@ -102,12 +102,12 @@ float projection_range = 0.2; // *2
 // std::string frameID = "sensor1/os_sensor";
 
 // ROI
-float MAX_X = 120; // 120
-float MIN_X = 0;
-float MAX_Y = 2.5; // 5
-float MIN_Y = -2.5; // 5
-float MAX_Z = -1.0; // -1.1
-float MIN_Z = -1.5; // -1.4
+float MAX_X = 100; // 120
+float MIN_X = 0; // 0
+float MAX_Y = 2.0; // 2.5
+float MIN_Y = -2.0; // 2.5
+float MAX_Z =  -0.5; // -1.0
+float MIN_Z = -1.9; // -1.5
 float max_x = 2;
 float min_x = -2;
 float max_y = 0.8;
