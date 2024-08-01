@@ -25,11 +25,11 @@ float leaf_size_x = 0.2f;
 float leaf_size_y = 0.2f;
 float leaf_size_z = 0.2f;
 // Filtering Cluster
-float minClusterSizeX = 0.3; // 0.2
+float minClusterSizeX = 0.1; // 0.2
 float maxClusterSizeX = 1.5; // 13
-float minClusterSizeY = 0.3; // 0.3
+float minClusterSizeY = 0.2; // 0.3
 float maxClusterSizeY = 1.5; // 13
-float minClusterSizeZ = 0.3; // 0.3
+float minClusterSizeZ = 0.1; // 0.3
 float maxClusterSizeZ = 1.5;
 // Euclidean Clustering
 float clusterTolerance = 0.3; // 더 올리면 전방 차량 클러스터링 못 함
@@ -42,9 +42,9 @@ int lidar_lines = 64; // LiDAR 라인 수
 int cluster_size = 3; // 최소 클러스터 크기
 // Adaptive Clustering
 float start_tolerance = 0.5;
-float delta_tolerance = 0.04;
+float delta_tolerance = 0.05;
 const int max_region = 120;
-const int number_region = 10;
+const int number_region = 5;
 float threshIOU = 0.1; // clustering and integration
 // L shape fitting
 float projection_range = 0.2; // *2
