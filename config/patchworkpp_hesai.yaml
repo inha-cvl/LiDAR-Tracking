@@ -2,7 +2,7 @@ save_flag: true
 
 # patchworkpp:
 
-sensor_height: 1.8
+sensor_height: 1.95
 
 mode: "czm"
 verbose: false   # To check effect of uprightness/elevation/flatness

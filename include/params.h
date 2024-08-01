@@ -2,7 +2,7 @@
 #include "point_type/os_point.h"
 #include "point_type/hesai_point.h"
 
-// Hesai 
+// Hesai
 int V_SCAN = 128; // Pandar 64 or OT 128
 int H_SCAN = 1800;
 float ang_res_x = 360.0 / float(H_SCAN);
@@ -102,11 +102,11 @@ float projection_range = 0.2; // *2
 // std::string frameID = "sensor1/os_sensor";
 
 // ROI
-float MAX_X = 100; // 120
-float MIN_X = 0; // 0
-float MAX_Y = 2.0; // 2.5
-float MIN_Y = -2.0; // 2.5
-float MAX_Z =  -0.5; // -1.0
+float MAX_X = 120; // 120
+float MIN_X = -5; // 0
+float MAX_Y = 40.0; // 2.5
+float MIN_Y = -40.0; // 2.5
+float MAX_Z =  -0.3; // -1.0
 float MIN_Z = -1.9; // -1.5
 float max_x = 2;
 float min_x = -2;
