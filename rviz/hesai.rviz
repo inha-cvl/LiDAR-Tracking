@@ -24,7 +24,7 @@ Panels:
   - Class: rviz/Time
     Name: Time
     SyncMode: 0
-    SyncSource: DownsampledCloud
+    SyncSource: CropCloud
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -116,14 +116,14 @@ Visualization Manager:
       Channel Name: intensity
       Class: rviz/PointCloud2
       Color: 92; 53; 102
-      Color Transformer: ""
+      Color Transformer: Intensity
       Decay Time: 0
-      Enabled: false
+      Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Min Color: 0; 0; 0
       Name: CropCloud
-      Position Transformer: ""
+      Position Transformer: XYZ
       Queue Size: 10
       Selectable: true
       Size (Pixels): 3
@@ -133,7 +133,7 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: false
+      Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -174,7 +174,7 @@ Visualization Manager:
       Color: 239; 41; 41
       Color Transformer: FlatColor
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 164; 0; 0
       Min Color: 0; 0; 0
@@ -189,7 +189,7 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 1
       Class: rviz/Axes
       Enabled: true
@@ -263,7 +263,7 @@ Visualization Manager:
       Marker Topic: /mobinha/visualize/visualize/track_model
       Name: MarkerArray
       Namespaces:
-        model: true
+        {}
       Queue Size: 1
       Value: true
   Enabled: true
@@ -294,7 +294,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 75.4945068359375
+      Distance: 127.87069702148438
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -302,17 +302,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0
-        Y: 0
-        Z: 0
+        X: 2.576916456222534
+        Y: 4.904429912567139
+        Z: 5.846888065338135
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.5947951078414917
+      Pitch: 0.8347950577735901
       Target Frame: <Fixed Frame>
-      Yaw: 3.0699963569641113
+      Yaw: 3.1599984169006348
     Saved: ~
 Window Geometry:
   Displays:

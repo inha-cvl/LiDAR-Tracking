@@ -54,16 +54,18 @@ include_directories(
         include
         ${catkin_INCLUDE_DIRS}
         ${PCL_INCLUDE_DIRS}
-        ${OpenCV_INCLUDE_DIRS}       
+        ${OpenCV_INCLUDE_DIRS}
 )
 
-add_subdirectory(src/lib)
+pkg_check_modules(JSONCPP jsoncpp)
+#link_libraries(${JSONCPP_LIBRARIES})
 
+add_subdirectory(src/lib)
 add_executable(cloud_segmentation src/cloud_segmentation.cpp)
 add_executable(tracking src/tracking.cpp)
 
-target_link_libraries(cloud_segmentation ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} track_lib)
-target_link_libraries(tracking ${catkin_LIBRARIES} track_lib)
+target_link_libraries(cloud_segmentation ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${JSONCPP_LIBRARIES} track_lib)
+target_link_libraries(tracking ${catkin_LIBRARIES} ${JSONCPP_LIBRARIES} track_lib)
 
 # ==== Install ====
 install(TARGETS cloud_segmentation tracking

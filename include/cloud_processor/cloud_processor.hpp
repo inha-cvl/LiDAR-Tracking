@@ -15,6 +15,8 @@
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
 
+#include <jsoncpp/json/json.h>
+
 #include "params.h"
 #include "undistortion/data_process/data_process.h"
 #include "patchworkpp/patchworkpp.hpp"
@@ -493,6 +495,153 @@ void cropPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn,
         }
         */
     }
+
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end - start;
+    time_taken = elapsed_seconds.count();
+}
+
+std::vector<std::pair<float, float>> map_reader()
+{
+    Json::Value root;      
+    Json::Reader reader;
+    std::ifstream t;
+    std::vector<std::pair<float, float>> global_path;
+    string index;
+    //t.open("package://lidar_tracking/map/kiapi.json");
+    t.open("/home/q/catkin_ws/src/LiDAR-Tracking/map/kiapi.json");
+    if (!reader.parse(t, root)) {
+        cout << "Parsing Failed" << endl;
+    }
+    for (int k=0;k<root.size();++k){
+        index = to_string(k);
+        double x = root[index][0].asDouble();
+        double y = root[index][1].asDouble();
+        global_path.emplace_back(x, y);
+    }
+    std::cout << "Global Path Created : " << global_path.size() << std::endl;
+    // curr_index = 0;
+
+    return global_path;
+}
+
+void cropPointCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &cloudIn, pcl::PointCloud<pcl::PointXYZI>::Ptr &cloudOut, 
+                    const ros::Time &input_stamp, tf2_ros::Buffer &tf_buffer, const std::string target_frame, 
+                    const std::string world_frame, const std::vector<std::pair<float, float>> global_path, double &time_taken)
+{
+    auto start = std::chrono::steady_clock::now();
+
+    cloudOut->clear();
+    cloudOut->reserve(cloudIn->size());
+
+    pcl::PointCloud<pcl::PointXYZI>::Ptr tempCloud(new pcl::PointCloud<pcl::PointXYZI>);
+    for (const auto& inPoint : cloudIn->points)
+    {
+        const pcl::PointXYZI& point = inPoint;
+        
+        // Car exclusion
+        if (point.x >= min_x && point.x <= max_x &&
+            point.y >= min_y && point.y <= max_y) { continue; }
+
+        // Rectangle
+        if (point.x >= MIN_X && point.x <= MAX_X &&
+            point.y >= MIN_Y && point.y <= MAX_Y &&
+            point.z <= MAX_Z)
+            // point.z >= MIN_Z && point.z <= MAX_Z)
+        {
+            tempCloud->push_back(point);
+        }
+    }
+
+    pcl::KdTreeFLANN<pcl::PointXYZI> kdtree;
+    kdtree.setInputCloud(tempCloud);
+
+    geometry_msgs::TransformStamped transformStamped;
+    try {
+        transformStamped = tf_buffer.lookupTransform(world_frame, target_frame, ros::Time(0)); // input_stamp
+    } catch (tf2::TransformException &ex) {
+        ROS_WARN("%s", ex.what());
+        cloudOut = tempCloud;
+        return;  // Handle the exception or exit
+    }
+
+    double ego_x = transformStamped.transform.translation.x;
+    double ego_y = transformStamped.transform.translation.y;
+    tf2::Quaternion q(transformStamped.transform.rotation.x,
+                        transformStamped.transform.rotation.y,
+                        transformStamped.transform.rotation.z,
+                        transformStamped.transform.rotation.w);
+
+    tf2::Matrix3x3 m(q);
+    double roll, pitch, yaw;
+    m.getRPY(roll, pitch, yaw);
+    //double heading = transformStamped.transform.rotation.w;
+    //double heading_rad = heading * 3.141592 / 180;
+    double heading_rad = yaw; //heading * 3.141592 / 180;
+
+    double min_dis = 1000;
+    int min_idx = 0;
+    int step_size = 4000;
+
+    for (int i = 0; i < 4042; ++i) {
+        // std::cout << global_path[i].first << std::endl;
+        double dis = std::hypot(global_path[i].first - ego_x, global_path[i].second - ego_y);
+
+        if (min_dis > dis) {
+            min_dis = dis;
+            min_idx = i;
+        }
+    }
+
+    int curr_index = min_idx;
+    // int path_len = global_path.size();
+    // int min_lookback = std::min(curr_index, 200);
+    // int max_lookforward = std::min(200, path_len - curr_index - 1);
+    // // for(int i = -min_lookback; i < max_lookforward;++i){
+    // std::cout << "===========" << std::endl;
+    // std::cout << path_len << std::endl;
+    // std::cout << curr_index << std::endl;
+    // std::cout << ego_x << std::endl;
+    // std::cout << ego_y << std::endl;
+    // std::cout << global_path[curr_index].first  << std::endl;
+    // std::cout << global_path[curr_index].second << std::endl;
+    
+    double relative_node_x, relative_node_y;
+
+    for (int i = curr_index - std::min(200, curr_index); i < curr_index + std::min(200, 4000-curr_index);++i) {
+        if (i%2==0) {
+
+            double dx = global_path[i].first - ego_x;
+            double dy = global_path[i].second - ego_y;
+
+            double cos_heading = std::cos(heading_rad);
+            double sin_heading = std::sin(heading_rad);
+
+            relative_node_x = cos_heading * dx + sin_heading * dy;
+            relative_node_y = -sin_heading * dx + cos_heading * dy;
+            
+            pcl::PointXYZI query;
+            query.x = static_cast<float>(relative_node_x);
+            query.y = static_cast<float>(relative_node_y);
+            query.z = 0.0f;
+            query.intensity = 0.0f;
+            // std::cout << query.x << ", " << query.y << std::endl;
+
+            std::vector<int> idxes;
+            std::vector<float> sqr_dists;
+
+            idxes.clear();
+            sqr_dists.clear();
+            
+            float radius = 5.2;
+
+            kdtree.radiusSearch(query, radius, idxes, sqr_dists);
+            for (const auto& idx : idxes) {
+                cloudOut->points.push_back(cloudIn->points[idx]);
+            }
+        }
+    }   
+    // std::cout << curr_index << std::endl;
 
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;

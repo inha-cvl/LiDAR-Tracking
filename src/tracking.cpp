@@ -10,7 +10,6 @@ Track tracker;
 double t8, t9, t10, t11, total;
 std::string fixed_frame;
 
-// correction
 tf2_ros::Buffer tf_buffer;
 
 jsk_recognition_msgs::BoundingBoxArray cluster_bbox_array, deep_bbox_array, integration_bbox_array, track_bbox_array, transformed_bbox_array, corrected_bbox_array, output_bbox_array;
