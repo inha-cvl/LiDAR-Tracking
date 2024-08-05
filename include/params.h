@@ -106,8 +106,8 @@ float projection_range = 0.2; // *2
 // ROI
 float MAX_X = 120; // 120
 float MIN_X = 0; // 0
-float MAX_Y = 4.7; // 2.5
-float MIN_Y = -4.7; // 2.5
+float MAX_Y = 80.0; // 2.5
+float MIN_Y = -80.0; // 2.5
 float MAX_Z =  -0.3; // -1.0
 float MIN_Z = -1.9; // -1.5
 float max_x = 2;

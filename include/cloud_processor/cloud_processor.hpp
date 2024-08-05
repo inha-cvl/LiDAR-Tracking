@@ -227,7 +227,7 @@ std::vector<std::pair<float, float>> map_reader()
     std::vector<std::pair<float, float>> global_path;
     string index;
     //t.open("package://lidar_tracking/map/kiapi.json");
-    t.open("/home/q/catkin_ws/src/LiDAR-Tracking/map/kiapi.json");
+    t.open("/home/inha/catkin_ws/src/LiDAR-Tracking/map/kiapi.json");
     if (!reader.parse(t, root)) {
         cout << "Parsing Failed" << endl;
     }
@@ -563,6 +563,7 @@ void cropPointCloudHDMap(const typename pcl::PointCloud<PointT>::Ptr &cloudIn, t
     cloudOut->reserve(cloudIn->size());
 
     pcl::KdTreeFLANN<PointT> kdtree;
+
     kdtree.setInputCloud(cloudIn);
 
     geometry_msgs::TransformStamped transformStamped;
@@ -590,22 +591,23 @@ void cropPointCloudHDMap(const typename pcl::PointCloud<PointT>::Ptr &cloudIn, t
     // int step_size = 4000;
 
     int path_len = global_path.size();
-
+    
     for (int i = 0; i < path_len; ++i) {
         double dis = std::hypot(global_path[i].first - ego_x, global_path[i].second - ego_y);
         if (min_dis > dis) { min_dis = dis; min_idx = i; }
     }
 
+
     int curr_index = min_idx;
     
-    
     double relative_node_x, relative_node_y;
-
+    
     std::vector<int> indices;
     for (int k = 0; k < 150; ++k) {
+
         indices.push_back((curr_index + k) % path_len);
     }
-
+    
     for (int idx : indices){
         if (idx%2==0){
 
@@ -617,13 +619,15 @@ void cropPointCloudHDMap(const typename pcl::PointCloud<PointT>::Ptr &cloudIn, t
 
             relative_node_x = cos_heading * dx + sin_heading * dy;
             relative_node_y = -sin_heading * dx + cos_heading * dy;
-            
+
+
             PointT query;
             query.x = static_cast<float>(relative_node_x);
             query.y = static_cast<float>(relative_node_y);
             query.z = 0.0f;
             // query.intensity = 0.0f;
             // std::cout << query.x << ", " << query.y << std::endl;
+            
 
             std::vector<int> idxes;
             std::vector<float> sqr_dists;
@@ -632,11 +636,14 @@ void cropPointCloudHDMap(const typename pcl::PointCloud<PointT>::Ptr &cloudIn, t
             sqr_dists.clear();
             
             kdtree.radiusSearch(query, radius, idxes, sqr_dists);
+            
+            
             for (const auto& idx : idxes) {
                 cloudOut->points.push_back(cloudIn->points[idx]);
             }
         }
     }
+    
 
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
