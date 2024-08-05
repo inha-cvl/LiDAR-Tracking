@@ -165,7 +165,7 @@ visualization_msgs::Marker Track::get_text_msg(struct trackingStruct &track, int
 	char buf[100];
 	//sprintf(buf, "ID : %d", track.id*10+1);
 	//sprintf(buf, "%f", text.pose.position.y);
-	sprintf(buf, "ID: %d\nV: %dkm/h", track.id, int(track.v*3.6));
+	sprintf(buf, "ID: %d\nAge: %d\nV: %dkm/h", track.id, track.age ,int(track.v*3.6));
 
 	text.text = buf;
 

@@ -20,17 +20,19 @@ uint16_t ring = 2; // if (point.ring % ring == 0)
 // intensity crop
 bool crop_intensity = false;
 float intensity = 10;
+// hd map crop
+float radius = 4.7;
 // downsampling
 float leaf_size_x = 0.2f;
 float leaf_size_y = 0.2f;
 float leaf_size_z = 0.2f;
 // Filtering Cluster
-float minClusterSizeX = 0.1; // 0.2
+float minClusterSizeX = 0.2; // 0.1
 float maxClusterSizeX = 1.5; // 13
-float minClusterSizeY = 0.2; // 0.3
+float minClusterSizeY = 0.2; // 0.2
 float maxClusterSizeY = 1.5; // 13
-float minClusterSizeZ = 0.1; // 0.3
-float maxClusterSizeZ = 1.5;
+float minClusterSizeZ = 0.2; // 0.1
+float maxClusterSizeZ = 1.0;
 // Euclidean Clustering
 float clusterTolerance = 0.3; // 더 올리면 전방 차량 클러스터링 못 함
 int minSize = 10;
@@ -103,9 +105,9 @@ float projection_range = 0.2; // *2
 
 // ROI
 float MAX_X = 120; // 120
-float MIN_X = -5; // 0
-float MAX_Y = 20.0; // 2.5
-float MIN_Y = -20.0; // 2.5
+float MIN_X = 0; // 0
+float MAX_Y = 4.7; // 2.5
+float MIN_Y = -4.7; // 2.5
 float MAX_Z =  -0.3; // -1.0
 float MIN_Z = -1.9; // -1.5
 float max_x = 2;
