@@ -21,7 +21,7 @@ uint16_t ring = 2; // if (point.ring % ring == 0)
 bool crop_intensity = false;
 float intensity = 10;
 // hd map crop
-float radius = 4.7;
+float radius = 5.0;
 // downsampling
 float leaf_size_x = 0.2f;
 float leaf_size_y = 0.2f;
@@ -106,9 +106,9 @@ float projection_range = 0.2; // *2
 // ROI
 float MAX_X = 120; // 120
 float MIN_X = 0; // 0
-float MAX_Y = 4.7; // 2.5
-float MIN_Y = -4.7; // 2.5
-float MAX_Z =  -0.5; // -1.0
+float MAX_Y = 10.0; // 2.5
+float MIN_Y = -10.0; // 2.5
+float MAX_Z =  -1.2; // -1.0
 float MIN_Z = -1.9; // -1.5
 float max_x = 2;
 float min_x = -2;

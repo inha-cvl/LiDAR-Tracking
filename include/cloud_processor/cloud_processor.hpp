@@ -218,45 +218,42 @@ Eigen::Quaterniond calculateRotationBetweenStamps(const std::deque<sensor_msgs::
 
     return rotation_increment;
 }
-/*
+
 #include <ros/package.h>
-std::vector<std::pair<float, float>> map_reader() {
-    std::string path = ros::package::getPath("lidar_tracking");
-    if (path.empty()) {
-        std::cerr << "Failed to find package 'lidar_tracking'." << std::endl;
-        return {};
-    }
-    // path += "/map/kiapi.json";  // JSON 파일 경로 추가
-
-    t.open("/home/inha/catkin_ws/src/LiDAR-Tracking/map/kiapi.json");
-
-    Json::Value root;
+std::vector<std::pair<float, float>> map_reader()
+{
+    Json::Value root;      
     Json::Reader reader;
-    std::ifstream file_stream(path);
     std::vector<std::pair<float, float>> global_path;
+    std::string index;
 
-    if (!file_stream.is_open()) {
-        std::cerr << "Failed to open file: " << path << std::endl;
-        return {};
+    // ROS 패키지 경로 얻기
+    std::string package_path = ros::package::getPath("lidar_tracking");
+    std::string json_file_path = package_path + "/map/kiapi.json";  // 상대 경로 사용
+
+    std::ifstream t(json_file_path);
+    if (!t.is_open()) {
+        std::cout << "Failed to open file: " << json_file_path << std::endl;
+        return global_path;
     }
 
-    if (!reader.parse(file_stream, root)) {
+    if (!reader.parse(t, root)) {
         std::cout << "Parsing Failed" << std::endl;
-        return {};
+        return global_path;
     }
 
     for (int k = 0; k < root.size(); ++k) {
-        std::string index = std::to_string(k);
+        index = std::to_string(k);
         double x = root[index][0].asDouble();
         double y = root[index][1].asDouble();
         global_path.emplace_back(x, y);
     }
-    std::cout << "Global Path Created : " << global_path.size() << std::endl;
-
+    
+    std::cout << "Global Path Created: " << global_path.size() << std::endl;
+    
     return global_path;
 }
-*/
-
+/*
 std::vector<std::pair<float, float>> map_reader()
 {
     Json::Value root;      
@@ -265,7 +262,7 @@ std::vector<std::pair<float, float>> map_reader()
     std::vector<std::pair<float, float>> global_path;
     string index;
     //std::ifstream t(path);
-    t.open("/home/inha/catkin_ws/src/LiDAR-Tracking/map/kiapi.json");
+    t.open("/home/q/catkin_ws/src/LiDAR-Tracking/map/kiapi.json");
     if (!reader.parse(t, root)) {
         cout << "Parsing Failed" << endl;
     }
@@ -280,7 +277,7 @@ std::vector<std::pair<float, float>> map_reader()
 
     return global_path;
 }
-
+*/
 void transformMsgToEigen(const geometry_msgs::Transform &transform_msg, Eigen::Affine3f &transform) 
 {  
     transform =
@@ -561,7 +558,7 @@ void cropPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn,
         if (point.x >= MIN_X && point.x <= MAX_X &&
             point.y >= MIN_Y && point.y <= MAX_Y &&
             point.z <= MAX_Z)
-            // point.z >= MIN_Z && point.z <= MAX_Z)
+            //point.z >= MIN_Z && point.z <= MAX_Z)
         {
             cloudOut->push_back(point);
         }
@@ -596,6 +593,11 @@ void cropPointCloudHDMap(const typename pcl::PointCloud<PointT>::Ptr &cloudIn, t
                     const std::string world_frame, const std::vector<std::pair<float, float>> &global_path, double &time_taken)
 {
     auto start = std::chrono::steady_clock::now();
+
+    if (cloudIn->points.empty()) {
+        std::cerr << "Input cloud is empty!" << std::endl;
+        return;
+    }
 
     cloudOut->clear();
     cloudOut->reserve(cloudIn->size());
@@ -664,8 +666,6 @@ void cropPointCloudHDMap(const typename pcl::PointCloud<PointT>::Ptr &cloudIn, t
             query.y = static_cast<float>(relative_node_y);
             query.z = 0.0f;
             // query.intensity = 0.0f;
-            // std::cout << query.x << ", " << query.y << std::endl;
-            
 
             std::vector<int> idxes;
             std::vector<float> sqr_dists;
@@ -933,6 +933,12 @@ void fittingLShape(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &input
     {   
         pcl::PointXYZ minPoint, maxPoint;
         pcl::getMinMax3D(*cluster, minPoint, maxPoint);
+
+        // semi final
+        if( minPoint.z < -1.75 && maxPoint.z > -1.75)
+        {
+        }
+        else { continue; }
 
         // rectangle
         LShapedFIT lshaped;
