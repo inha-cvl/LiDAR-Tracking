@@ -32,7 +32,7 @@ float maxClusterSizeX = 1.5; // 13
 float minClusterSizeY = 0.2; // 0.2
 float maxClusterSizeY = 1.5; // 13
 float minClusterSizeZ = 0.2; // 0.1
-float maxClusterSizeZ = 1.0;
+float maxClusterSizeZ = 0.8;
 // Euclidean Clustering
 float clusterTolerance = 0.3; // 더 올리면 전방 차량 클러스터링 못 함
 int minSize = 10;
@@ -106,9 +106,9 @@ float projection_range = 0.2; // *2
 // ROI
 float MAX_X = 120; // 120
 float MIN_X = 0; // 0
-float MAX_Y = 80.0; // 2.5
-float MIN_Y = -80.0; // 2.5
-float MAX_Z =  -0.3; // -1.0
+float MAX_Y = 4.7; // 2.5
+float MIN_Y = -4.7; // 2.5
+float MAX_Z =  -0.5; // -1.0
 float MIN_Z = -1.9; // -1.5
 float max_x = 2;
 float min_x = -2;

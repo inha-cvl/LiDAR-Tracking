@@ -2,14 +2,14 @@ save_flag: true
 
 # patchworkpp:
 
-sensor_height: 1.95
+sensor_height: 2.0
 
 mode: "czm"
 verbose: false   # To check effect of uprightness/elevation/flatness
 visualize: true  # Ground Likelihood Estimation is visualized
 
 # Ground Plane Fitting parameters
-num_iter: 3             # Number of iterations for ground plane estimation using PCA.
+num_iter: 4             # Number of iterations for ground plane estimation using PCA.
 num_lpr: 20             # Maximum number of points to be selected as lowest points representative.
 num_min_pts: 10         # Minimum number of points to be estimated as ground plane in each patch.
 th_seeds: 0.1           # threshold for lowest point representatives using in initial seeds selection of ground points.
