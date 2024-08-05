@@ -575,18 +575,14 @@ void cropPointCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &cloudIn, pcl::Po
     tf2::Matrix3x3 m(q);
     double roll, pitch, yaw;
     m.getRPY(roll, pitch, yaw);
-    //double heading = transformStamped.transform.rotation.w;
-    //double heading_rad = heading * 3.141592 / 180;
-    double heading_rad = yaw; //heading * 3.141592 / 180;
+    double heading_rad = yaw; // * 3.141592 / 180; //heading * 3.141592 / 180;
 
     double min_dis = 1000;
     int min_idx = 0;
     int step_size = 4000;
 
     for (int i = 0; i < 4042; ++i) {
-        // std::cout << global_path[i].first << std::endl;
         double dis = std::hypot(global_path[i].first - ego_x, global_path[i].second - ego_y);
-
         if (min_dis > dis) {
             min_dis = dis;
             min_idx = i;
@@ -594,25 +590,20 @@ void cropPointCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &cloudIn, pcl::Po
     }
 
     int curr_index = min_idx;
-    // int path_len = global_path.size();
-    // int min_lookback = std::min(curr_index, 200);
-    // int max_lookforward = std::min(200, path_len - curr_index - 1);
-    // // for(int i = -min_lookback; i < max_lookforward;++i){
-    // std::cout << "===========" << std::endl;
-    // std::cout << path_len << std::endl;
-    // std::cout << curr_index << std::endl;
-    // std::cout << ego_x << std::endl;
-    // std::cout << ego_y << std::endl;
-    // std::cout << global_path[curr_index].first  << std::endl;
-    // std::cout << global_path[curr_index].second << std::endl;
+    int path_len = global_path.size();
     
     double relative_node_x, relative_node_y;
 
-    for (int i = curr_index - std::min(200, curr_index); i < curr_index + std::min(200, 4000-curr_index);++i) {
-        if (i%2==0) {
+    std::vector<int> indices;
+    for (int k = 0; k < 150; ++k) {
+        indices.push_back((curr_index + k) % path_len);
+    }
 
-            double dx = global_path[i].first - ego_x;
-            double dy = global_path[i].second - ego_y;
+    for (int idx : indices){
+        if (idx%2==0){
+
+            double dx = global_path[idx].first - ego_x;
+            double dy = global_path[idx].second - ego_y;
 
             double cos_heading = std::cos(heading_rad);
             double sin_heading = std::sin(heading_rad);
@@ -633,16 +624,32 @@ void cropPointCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &cloudIn, pcl::Po
             idxes.clear();
             sqr_dists.clear();
             
-            float radius = 5.2;
+            float radius = 5.5;
 
             kdtree.radiusSearch(query, radius, idxes, sqr_dists);
             for (const auto& idx : idxes) {
-                cloudOut->points.push_back(cloudIn->points[idx]);
+                cloudOut->points.push_back(tempCloud->points[idx]);
             }
         }
-    }   
-    // std::cout << curr_index << std::endl;
+    }
 
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end - start;
+    time_taken = elapsed_seconds.count();
+}
+
+void downsamplingPointCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &cloudIn, 
+                            pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudOut, double &time_taken)
+{
+    auto start = std::chrono::steady_clock::now();
+    
+    pcl::PointCloud<pcl::PointXYZ>::Ptr tempCloud(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::copyPointCloud(*cloudIn, *tempCloud);
+    pcl::VoxelGrid<pcl::PointXYZ> voxel_grid_filter;
+    voxel_grid_filter.setInputCloud(tempCloud);
+    voxel_grid_filter.setLeafSize(leaf_size_x, leaf_size_y, leaf_size_z);
+    voxel_grid_filter.filter(*cloudOut);
+    
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
@@ -664,6 +671,7 @@ void downsamplingPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn,
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
 }
+
 
 void EuclideanClustering(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudIn, 
                             vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &outputClusters, double &time_taken)
