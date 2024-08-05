@@ -218,7 +218,7 @@ Eigen::Quaterniond calculateRotationBetweenStamps(const std::deque<sensor_msgs::
 
     return rotation_increment;
 }
-
+/*
 #include <ros/package.h>
 std::vector<std::pair<float, float>> map_reader() {
     std::string path = ros::package::getPath("lidar_tracking");
@@ -226,7 +226,9 @@ std::vector<std::pair<float, float>> map_reader() {
         std::cerr << "Failed to find package 'lidar_tracking'." << std::endl;
         return {};
     }
-    path += "/map/kiapi.json";  // JSON 파일 경로 추가
+    // path += "/map/kiapi.json";  // JSON 파일 경로 추가
+
+    t.open("/home/inha/catkin_ws/src/LiDAR-Tracking/map/kiapi.json");
 
     Json::Value root;
     Json::Reader reader;
@@ -253,7 +255,8 @@ std::vector<std::pair<float, float>> map_reader() {
 
     return global_path;
 }
-/*
+*/
+
 std::vector<std::pair<float, float>> map_reader()
 {
     Json::Value root;      
@@ -261,8 +264,8 @@ std::vector<std::pair<float, float>> map_reader()
     std::ifstream t;
     std::vector<std::pair<float, float>> global_path;
     string index;
-    std::ifstream t(path);
-    // t.open("/home/inha/catkin_ws/src/LiDAR-Tracking/map/kiapi.json");
+    //std::ifstream t(path);
+    t.open("/home/inha/catkin_ws/src/LiDAR-Tracking/map/kiapi.json");
     if (!reader.parse(t, root)) {
         cout << "Parsing Failed" << endl;
     }
@@ -277,7 +280,7 @@ std::vector<std::pair<float, float>> map_reader()
 
     return global_path;
 }
-*/
+
 void transformMsgToEigen(const geometry_msgs::Transform &transform_msg, Eigen::Affine3f &transform) 
 {  
     transform =
