@@ -934,11 +934,29 @@ void fittingLShape(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &input
         pcl::PointXYZ minPoint, maxPoint;
         pcl::getMinMax3D(*cluster, minPoint, maxPoint);
 
+
+        std::cout << "average : " << (minPoint.z + maxPoint.z) / 2 << std::endl;
+        std::cout << "--------------------------" << std::endl;
+        
+
         // semi final
-        if( minPoint.z < -1.75 && maxPoint.z > -1.75)
-        {
+        //if ( -3.0 < minPoint.z && maxPoint.z < -1.6) { }
+        // if( minPoint.z < -1.65 && maxPoint.z > -1.65) { }// -1.75
+        //else if ( minPoint.z < -2.4 && maxPoint.z < -1.5 ) { } // -1.9
+        if (-2.8 < (minPoint.z + maxPoint.z) / 2 && (minPoint.z + maxPoint.z) / 2 < -1.4)
+        {   
+            if (maxPoint.z - minPoint.z > 0.3 && maxPoint.z - minPoint.z < 0.7)
+            { }
+            // std::cout << "average : " << (minPoint.z + maxPoint.z) / 2 << std::endl;
+            // std::cout << "--------------------------" << std::endl;
         }
+        // else if ( -2.3 < (minPoint.z + maxPoint.z) / 2 < -1.3) { }
         else { continue; }
+
+        // std::cout << "minPoint : " << minPoint.z << std::endl;
+        // std::cout << "maxPoint : " << maxPoint.z << std::endl;
+        // std::cout << "average : " << (minPoint.z + maxPoint.z) / 2 << std::endl;
+        // std::cout << "--------------------------" << std::endl;
 
         // rectangle
         LShapedFIT lshaped;

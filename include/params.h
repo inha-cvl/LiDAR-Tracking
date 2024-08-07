@@ -104,7 +104,7 @@ float projection_range = 0.2; // *2
 // std::string frameID = "sensor1/os_sensor";
 
 // ROI
-float MAX_X = 120; // 120
+float MAX_X = 150; // 120
 float MIN_X = 0; // 0
 float MAX_Y = 10.0; // 2.5
 float MIN_Y = -10.0; // 2.5
