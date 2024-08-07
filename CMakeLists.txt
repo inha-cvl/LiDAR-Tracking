@@ -8,6 +8,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+find_package(yaml-cpp REQUIRED)
+
 find_package(catkin REQUIRED COMPONENTS
         roscpp
         rospy
@@ -64,8 +66,8 @@ add_subdirectory(src/lib)
 add_executable(cloud_segmentation src/cloud_segmentation.cpp)
 add_executable(tracking src/tracking.cpp)
 
-target_link_libraries(cloud_segmentation ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${JSONCPP_LIBRARIES} track_lib)
-target_link_libraries(tracking ${catkin_LIBRARIES} ${JSONCPP_LIBRARIES} track_lib)
+target_link_libraries(cloud_segmentation ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${JSONCPP_LIBRARIES} ${YAML_CPP_LIBRARIES} track_lib)
+target_link_libraries(tracking ${catkin_LIBRARIES} ${JSONCPP_LIBRARIES} ${YAML_CPP_LIBRARIES} track_lib)
 
 # ==== Install ====
 install(TARGETS cloud_segmentation tracking

@@ -2,6 +2,8 @@
 
   <node name="cloud_segmentation" pkg="lidar_tracking" type="cloud_segmentation" output="screen">
     <rosparam command="load" file="$(find lidar_tracking)/config/patchworkpp_hesai.yaml" />
+    <rosparam command="load" file="$(find lidar_tracking)/config/adaptive_param.yaml" />
+
   </node>
   
   <node name="tracking" pkg="lidar_tracking" type="tracking" output="screen">

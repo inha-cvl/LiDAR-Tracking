@@ -65,6 +65,13 @@ void callbackIMU(const sensor_msgs::Imu::ConstPtr &msg_in)
     rotation_stamp = input_stamp;
 }
 
+#include <yaml-cpp/yaml.h>
+YAML::Node config = YAML::LoadFile("/home/inha/catkin_ws/src/LiDAR-Tracking/config/adaptive_param.yaml");
+float min_z_average = config["min_z_average"].as<float>();
+float max_z_average = config["max_z_average"].as<float>();
+float min_z_size = config["min_z_size"].as<float>();
+float max_z_size = config["max_z_size"].as<float>();
+
 void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
 {
     input_stamp = cloud_msg->header.stamp; // input_stamp
@@ -79,29 +86,26 @@ void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
     cropPointCloud(fullCloud, cropCloud, t3); // crop
     //pub_crop_cloud.publish(cloud2msg(*cropCloud, input_stamp, frameID));
 
-
     // pcl::PointCloud<pcl::PointXYZ>::Ptr tempCloud(new pcl::PointCloud<pcl::PointXYZ>);
     // pcl::copyPointCloud(*cropCloud, *tempCloud);
     // cropPointCloudHDMap<pcl::PointXYZ>(tempCloud, cropCloudHDMap, input_stamp, tf_buffer, target_frame, world_frame, global_path, t3);
     // pub_crop_cloud.publish(cloud2msg(*cropCloudHDMap, ros::Time::now(), frameID));
-    
 
     PatchworkppGroundSeg->estimate_ground(*cropCloud, *groundCloud, *nonGroundCloud, t4); // ground removal
     // pub_ground.publish(cloud2msg(*groundCloud, input_stamp, frameID));
-    //pub_non_ground.publish(cloud2msg(*nonGroundCloud, input_stamp, frameID)); // detection 전달 때문에 input_stamp 사용
-    undistortPointCloud(nonGroundCloud, rotation, undistortionCloud, t1);
-    //pub_undistortion_cloud.publish(cloud2msg(*undistortionCloud, input_stamp, frameID));
+    pub_non_ground.publish(cloud2msg(*nonGroundCloud, input_stamp, frameID)); // detection 전달 때문에 input_stamp 사용
+    //undistortPointCloud(nonGroundCloud, rotation, undistortionCloud, t1);
+    pub_undistortion_cloud.publish(cloud2msg(*undistortionCloud, input_stamp, frameID));
     // depthClustering(nonGroundCloud, cluster_array, t6);
-    downsamplingPointCloud(undistortionCloud, downsamplingCloud, t5); // downsampling
+    //downsamplingPointCloud(undistortionCloud, downsamplingCloud, t5); // downsampling
     // pub_downsampling_cloud.publish(cloud2msg(*downsamplingCloud, ros::Time::now(), frameID));
     cropPointCloudHDMap<pcl::PointXYZ>(downsamplingCloud, cropCloudHDMap, input_stamp, tf_buffer, target_frame, world_frame, global_path, t3);
     pub_crop_cloud.publish(cloud2msg(*cropCloudHDMap, ros::Time::now(), frameID));
     adaptiveClustering(cropCloudHDMap, cluster_array, t6);
     //EuclideanClustering(downsamplingCloud, cluster_array, t6); // clustering
-    fittingLShape(cluster_array, input_stamp, cluster_bbox_array, t7); // L shape fitting
+    fittingLShape(cluster_array, input_stamp, cluster_bbox_array, t7, min_z_average, max_z_average, min_z_size, max_z_size); // L shape fitting
     pub_cluster_box.publish(bba2msg(cluster_bbox_array, input_stamp, frameID)); // input_stamp
 
-    // std::cout << "\033[2J" << "\033[" << 10 << ";" << 30 << "H" << std::endl;
     // std::cout << "undistortion : " << t1 << " sec" << std::endl;
     // std::cout << "projection : " << t2 << " sec" << std::endl;
     // std::cout << "crop : " << t3 << " sec" << std::endl;

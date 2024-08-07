@@ -922,10 +922,19 @@ void depthClustering(const pcl::PointCloud<PointType>::Ptr &cloudIn,
     time_taken = elapsed_seconds.count();
 }
 
+
 void fittingLShape(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &inputClusters, const ros::Time &input_stamp, 
-                jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken)
+                jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken,
+                float min_z_average, float max_z_average, float min_z_size, float max_z_size)
 {
     auto start = std::chrono::steady_clock::now();
+
+    // std::cout << "\033[2J" << "\033[" << 10 << ";" << 30 << "H" << std::endl;
+    // std::cout << "min_z_average : " << min_z_average << std::endl;
+    // std::cout << "max_z_average : " << max_z_average << std::endl;
+    // std::cout << "min_z_size : " << min_z_size << std::endl;
+    // std::cout << "max_z_size : " << max_z_size << std::endl;
+    // std::cout << "-----------------------------" << std::endl;
 
     output_bbox_array.boxes.clear();
 
@@ -934,18 +943,14 @@ void fittingLShape(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &input
         pcl::PointXYZ minPoint, maxPoint;
         pcl::getMinMax3D(*cluster, minPoint, maxPoint);
 
-
-        std::cout << "average : " << (minPoint.z + maxPoint.z) / 2 << std::endl;
-        std::cout << "--------------------------" << std::endl;
-        
-
         // semi final
         //if ( -3.0 < minPoint.z && maxPoint.z < -1.6) { }
         // if( minPoint.z < -1.65 && maxPoint.z > -1.65) { }// -1.75
         //else if ( minPoint.z < -2.4 && maxPoint.z < -1.5 ) { } // -1.9
-        if (-2.8 < (minPoint.z + maxPoint.z) / 2 && (minPoint.z + maxPoint.z) / 2 < -1.4)
+
+        if (min_z_average < (minPoint.z + maxPoint.z) / 2 && (minPoint.z + maxPoint.z) / 2 < max_z_average)
         {   
-            if (maxPoint.z - minPoint.z > 0.3 && maxPoint.z - minPoint.z < 0.7)
+            if (maxPoint.z - minPoint.z > min_z_size && maxPoint.z - minPoint.z < max_z_size)
             { }
             // std::cout << "average : " << (minPoint.z + maxPoint.z) / 2 << std::endl;
             // std::cout << "--------------------------" << std::endl;
