@@ -27,12 +27,12 @@ float leaf_size_x = 0.2f;
 float leaf_size_y = 0.2f;
 float leaf_size_z = 0.2f;
 // Filtering Cluster
-float minClusterSizeX = 0.2; // 0.1
-float maxClusterSizeX = 1.5; // 13
-float minClusterSizeY = 0.2; // 0.2
-float maxClusterSizeY = 1.5; // 13
-float minClusterSizeZ = 0.2; // 0.1
-float maxClusterSizeZ = 0.8;
+float minClusterSizeX = 0.4; // 0.1
+float maxClusterSizeX = 5.0; // 13
+float minClusterSizeY = 0.4; // 0.2
+float maxClusterSizeY = 5.0; // 13
+float minClusterSizeZ = 0.4; // 0.1
+float maxClusterSizeZ = 2.3;
 // Euclidean Clustering
 float clusterTolerance = 0.3; // 더 올리면 전방 차량 클러스터링 못 함
 int minSize = 10;
@@ -43,8 +43,8 @@ float horizontal_resolution = 1.5f; // 가상의 수평 해상도
 int lidar_lines = 64; // LiDAR 라인 수
 int cluster_size = 3; // 최소 클러스터 크기
 // Adaptive Clustering
-float start_tolerance = 0.5;
-float delta_tolerance = 0.05;
+float start_tolerance = 0.2;
+float delta_tolerance = 0.16;
 const int max_region = 120;
 const int number_region = 5;
 float threshIOU = 0.1; // clustering and integration
@@ -104,12 +104,12 @@ float projection_range = 0.2; // *2
 // std::string frameID = "sensor1/os_sensor";
 
 // ROI
-float MAX_X = 150; // 120
-float MIN_X = 0; // 0
-float MAX_Y = 10.0; // 2.5
-float MIN_Y = -10.0; // 2.5
-float MAX_Z =  -1.2; // -1.0
-float MIN_Z = -1.9; // -1.5
+float MAX_X = 120; // 120
+float MIN_X = -80; // 0
+float MAX_Y = 80.0; // 2.5
+float MIN_Y = -80.0; // 2.5
+float MAX_Z =  -0.3; // -1.0
+float MIN_Z = -1.7; // -1.5
 float max_x = 2;
 float min_x = -2;
 float max_y = 0.8;

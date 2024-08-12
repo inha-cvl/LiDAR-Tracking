@@ -4,7 +4,7 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
-        - /MarkerArray1/Namespaces1
+        - /TrackText1/Namespaces1
       Splitter Ratio: 0.37254902720451355
     Tree Height: 549
   - Class: rviz/Selection
@@ -49,6 +49,15 @@ Visualization Manager:
       Plane: XY
       Plane Cell Count: 200
       Reference Frame: <Fixed Frame>
+      Value: true
+    - Alpha: 1
+      Class: rviz/Axes
+      Enabled: true
+      Length: 2
+      Name: Axes
+      Radius: 0.30000001192092896
+      Reference Frame: <Fixed Frame>
+      Show Trail: false
       Value: true
     - Alpha: 0.5
       Autocompute Intensity Bounds: true
@@ -118,7 +127,7 @@ Visualization Manager:
       Color: 92; 53; 102
       Color Transformer: Intensity
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Min Color: 0; 0; 0
@@ -133,7 +142,7 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -174,7 +183,7 @@ Visualization Manager:
       Color: 239; 41; 41
       Color Transformer: FlatColor
       Decay Time: 0
-      Enabled: false
+      Enabled: true
       Invert Rainbow: false
       Max Color: 164; 0; 0
       Min Color: 0; 0; 0
@@ -189,15 +198,6 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: false
-    - Alpha: 1
-      Class: rviz/Axes
-      Enabled: true
-      Length: 2
-      Name: Axes
-      Radius: 0.30000001192092896
-      Reference Frame: <Fixed Frame>
-      Show Trail: false
       Value: true
     - Class: rviz/Image
       Enabled: true
@@ -212,12 +212,12 @@ Visualization Manager:
       Unreliable: false
       Value: true
     - Class: jsk_rviz_plugin/BoundingBoxArray
-      Enabled: false
-      Name: BoundingBoxArray
+      Enabled: true
+      Name: ClusterBox
       Queue Size: 10
       Topic: /cloud_segmentation/cluster_box
       Unreliable: false
-      Value: false
+      Value: true
       alpha: 0.800000011920929
       color: 255; 255; 255
       coloring: Flat color
@@ -226,7 +226,7 @@ Visualization Manager:
       show coords: false
     - Class: jsk_rviz_plugin/BoundingBoxArray
       Enabled: false
-      Name: BoundingBoxArray
+      Name: DeepBox
       Queue Size: 10
       Topic: /deep_box
       Unreliable: false
@@ -239,7 +239,7 @@ Visualization Manager:
       show coords: false
     - Class: jsk_rviz_plugin/BoundingBoxArray
       Enabled: false
-      Name: BoundingBoxArray
+      Name: TrackBox
       Queue Size: 10
       Topic: /mobinha/perception/lidar/track_box
       Unreliable: false
@@ -253,19 +253,19 @@ Visualization Manager:
     - Class: rviz/MarkerArray
       Enabled: false
       Marker Topic: /mobinha/visualize/visualize/track_text
-      Name: MarkerArray
+      Name: TrackText
       Namespaces:
         {}
       Queue Size: 1
       Value: false
     - Class: rviz/MarkerArray
-      Enabled: true
+      Enabled: false
       Marker Topic: /mobinha/visualize/visualize/track_model
-      Name: MarkerArray
+      Name: TrackModel
       Namespaces:
         {}
       Queue Size: 1
-      Value: true
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 0; 0; 0
@@ -294,7 +294,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 127.87069702148438
+      Distance: 19.616918563842773
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -302,17 +302,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 2.576916456222534
-        Y: 4.904429912567139
-        Z: 5.846888065338135
+        X: 2.2656846046447754
+        Y: 3.010236978530884
+        Z: 7.221590518951416
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.8347950577735901
+      Pitch: 0.5247971415519714
       Target Frame: <Fixed Frame>
-      Yaw: 3.1599984169006348
+      Yaw: 1.551803469657898
     Saved: ~
 Window Geometry:
   Displays:

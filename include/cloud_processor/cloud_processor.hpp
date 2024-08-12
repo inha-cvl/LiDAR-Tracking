@@ -424,6 +424,11 @@ void projectPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn,
 {
     auto start = std::chrono::steady_clock::now();
 
+    if (cloudIn->points.empty()) {
+        std::cerr << "Input cloud is empty! <- projectPointCloud" << std::endl;
+        return;
+    }
+
     cloudOut->clear();
     cloudOut->points.resize(V_SCAN * H_SCAN);
 
@@ -468,8 +473,14 @@ void projectPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn,
     time_taken = elapsed_seconds.count();
 }
 
-void convertPointCloudToImage(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, cv::Mat &imageOut)
-{
+void convertPointCloudToImage(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, cv::Mat &imageOut, double &time_taken)
+{   
+    auto start = std::chrono::steady_clock::now();
+
+    if (cloudIn->points.empty()) {
+        std::cerr << "Input cloud is empty! <- projectPointCloud" << std::endl;
+        return;
+    }
     cv::Mat temp_image = cv::Mat::zeros(V_SCAN, H_SCAN, CV_8UC1);
 
     for (int i = 0; i < V_SCAN; ++i)
@@ -488,6 +499,11 @@ void convertPointCloudToImage(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, c
 
     // Apply histogram equalization to enhance the image contrast
     cv::equalizeHist(temp_image, imageOut);
+
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end - start;
+    time_taken = elapsed_seconds.count();
+
 }
 
 // ouster
@@ -538,6 +554,11 @@ void cropPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn,
 {   
     auto start = std::chrono::steady_clock::now();
 
+    if (cloudIn->points.empty()) {
+        std::cerr << "Input cloud is empty! <- cropPointCloud" << std::endl;
+        return;
+    }
+    
     cloudOut->clear();
     cloudOut->reserve(cloudIn->size());
 
@@ -557,8 +578,8 @@ void cropPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn,
         // Rectangle
         if (point.x >= MIN_X && point.x <= MAX_X &&
             point.y >= MIN_Y && point.y <= MAX_Y &&
-            point.z <= MAX_Z)
-            //point.z >= MIN_Z && point.z <= MAX_Z)
+            //point.z <= MAX_Z)
+            point.z >= MIN_Z && point.z <= MAX_Z)
         {
             cloudOut->push_back(point);
         }
@@ -595,7 +616,7 @@ void cropPointCloudHDMap(const typename pcl::PointCloud<PointT>::Ptr &cloudIn, t
     auto start = std::chrono::steady_clock::now();
 
     if (cloudIn->points.empty()) {
-        std::cerr << "Input cloud is empty!" << std::endl;
+        std::cerr << "Input cloud is empty! <- cropPointCloudHDMap" << std::endl;
         return;
     }
 
@@ -693,15 +714,21 @@ void undistortPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, const 
 {
     auto start_time = std::chrono::steady_clock::now();
 
+    if (cloudIn->points.empty()) {
+        std::cerr << "Input cloud is empty! <- undistortPointCloud" << std::endl;
+        return;
+    }
+
     // Convert the quaternion to SO3 for easier manipulation and calculate its inverse
     Sophus::SO3d final_so3(rotation);
     Sophus::SO3d inverse_so3 = final_so3.inverse();
 
     // Process each point in the cloud
+    cloudOut->clear();
     cloudOut->points.resize(cloudIn->points.size());
-    cloudOut->width = cloudIn->width;
-    cloudOut->height = cloudIn->height;
-    cloudOut->is_dense = cloudIn->is_dense;
+    // cloudOut->width = cloudIn->width;
+    // cloudOut->height = cloudIn->height;
+    // cloudOut->is_dense = cloudIn->is_dense;
 
     for (size_t i = 0; i < cloudIn->points.size(); ++i) {
         const auto &pt = cloudIn->points[i];
@@ -727,7 +754,15 @@ void downsamplingPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn,
                             pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudOut, double &time_taken)
 {
     auto start = std::chrono::steady_clock::now();
-    
+
+    if (cloudIn->points.empty()) {
+        std::cerr << "Input cloud is empty! <- downsamplingPointCloud" << std::endl;
+        return;
+    }
+
+    cloudOut->clear();
+    // cloudOut->reserve(cloudIn->size());
+
     pcl::PointCloud<pcl::PointXYZ>::Ptr tempCloud(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::copyPointCloud(*cloudIn, *tempCloud);
     pcl::VoxelGrid<pcl::PointXYZ> voxel_grid_filter;
@@ -746,7 +781,7 @@ void EuclideanClustering(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudIn,
     auto start = std::chrono::steady_clock::now();
 
     if (cloudIn->points.empty()) {
-        std::cerr << "Input cloud is empty!" << std::endl;
+        std::cerr << "Input cloud is empty! <- EuclideanClustering" << std::endl;
         return;
     }
 
@@ -806,7 +841,7 @@ void adaptiveClustering(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudIn,
     auto start = std::chrono::high_resolution_clock::now();
 
     if (cloudIn->points.empty()) {
-        std::cerr << "Input cloud is empty!" << std::endl;
+        std::cerr << "Input cloud is empty! <- adaptiveClustering" << std::endl;
         return;
     }
 
@@ -924,17 +959,14 @@ void depthClustering(const pcl::PointCloud<PointType>::Ptr &cloudIn,
 
 
 void fittingLShape(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &inputClusters, const ros::Time &input_stamp, 
-                jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken,
-                float min_z_average, float max_z_average, float min_z_size, float max_z_size)
+                jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken)
 {
     auto start = std::chrono::steady_clock::now();
 
-    // std::cout << "\033[2J" << "\033[" << 10 << ";" << 30 << "H" << std::endl;
-    // std::cout << "min_z_average : " << min_z_average << std::endl;
-    // std::cout << "max_z_average : " << max_z_average << std::endl;
-    // std::cout << "min_z_size : " << min_z_size << std::endl;
-    // std::cout << "max_z_size : " << max_z_size << std::endl;
-    // std::cout << "-----------------------------" << std::endl;
+    if (inputClusters.empty()) {
+        std::cerr << "Input clusters is empty! <- fittingLShape" << std::endl;
+        return;
+    }
 
     output_bbox_array.boxes.clear();
 
@@ -942,26 +974,6 @@ void fittingLShape(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &input
     {   
         pcl::PointXYZ minPoint, maxPoint;
         pcl::getMinMax3D(*cluster, minPoint, maxPoint);
-
-        // semi final
-        //if ( -3.0 < minPoint.z && maxPoint.z < -1.6) { }
-        // if( minPoint.z < -1.65 && maxPoint.z > -1.65) { }// -1.75
-        //else if ( minPoint.z < -2.4 && maxPoint.z < -1.5 ) { } // -1.9
-
-        if (min_z_average < (minPoint.z + maxPoint.z) / 2 && (minPoint.z + maxPoint.z) / 2 < max_z_average)
-        {   
-            if (maxPoint.z - minPoint.z > min_z_size && maxPoint.z - minPoint.z < max_z_size)
-            { }
-            // std::cout << "average : " << (minPoint.z + maxPoint.z) / 2 << std::endl;
-            // std::cout << "--------------------------" << std::endl;
-        }
-        // else if ( -2.3 < (minPoint.z + maxPoint.z) / 2 < -1.3) { }
-        else { continue; }
-
-        // std::cout << "minPoint : " << minPoint.z << std::endl;
-        // std::cout << "maxPoint : " << maxPoint.z << std::endl;
-        // std::cout << "average : " << (minPoint.z + maxPoint.z) / 2 << std::endl;
-        // std::cout << "--------------------------" << std::endl;
 
         // rectangle
         LShapedFIT lshaped;
