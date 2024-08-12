@@ -1,4 +1,5 @@
 #include <ros/ros.h>
+#include <ros/package.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/Image.h>
 #include <geometry_msgs/TransformStamped.h>
@@ -219,7 +220,6 @@ Eigen::Quaterniond calculateRotationBetweenStamps(const std::deque<sensor_msgs::
     return rotation_increment;
 }
 
-#include <ros/package.h>
 std::vector<std::pair<float, float>> map_reader()
 {
     Json::Value root;      
@@ -229,7 +229,7 @@ std::vector<std::pair<float, float>> map_reader()
 
     // ROS 패키지 경로 얻기
     std::string package_path = ros::package::getPath("lidar_tracking");
-    std::string json_file_path = package_path + "/map/kiapi.json";  // 상대 경로 사용
+    std::string json_file_path = package_path + "/map/kiapi.json";
 
     std::ifstream t(json_file_path);
     if (!t.is_open()) {
@@ -253,31 +253,7 @@ std::vector<std::pair<float, float>> map_reader()
     
     return global_path;
 }
-/*
-std::vector<std::pair<float, float>> map_reader()
-{
-    Json::Value root;      
-    Json::Reader reader;
-    std::ifstream t;
-    std::vector<std::pair<float, float>> global_path;
-    string index;
-    //std::ifstream t(path);
-    t.open("/home/q/catkin_ws/src/LiDAR-Tracking/map/kiapi.json");
-    if (!reader.parse(t, root)) {
-        cout << "Parsing Failed" << endl;
-    }
-    for (int k=0;k<root.size();++k){
-        index = to_string(k);
-        double x = root[index][0].asDouble();
-        double y = root[index][1].asDouble();
-        global_path.emplace_back(x, y);
-    }
-    std::cout << "Global Path Created : " << global_path.size() << std::endl;
-    // curr_index = 0;
 
-    return global_path;
-}
-*/
 void transformMsgToEigen(const geometry_msgs::Transform &transform_msg, Eigen::Affine3f &transform) 
 {  
     transform =
@@ -608,7 +584,7 @@ void cropPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn,
     time_taken = elapsed_seconds.count();
 }
 
-template<typename PointT>
+template<typename PointT> // kdtree를 사용하여 PointType 제한
 void cropPointCloudHDMap(const typename pcl::PointCloud<PointT>::Ptr &cloudIn, typename pcl::PointCloud<PointT>::Ptr &cloudOut, 
                     const ros::Time &input_stamp, tf2_ros::Buffer &tf_buffer, const std::string target_frame, 
                     const std::string world_frame, const std::vector<std::pair<float, float>> &global_path, double &time_taken)
@@ -658,9 +634,7 @@ void cropPointCloudHDMap(const typename pcl::PointCloud<PointT>::Ptr &cloudIn, t
         if (min_dis > dis) { min_dis = dis; min_idx = i; }
     }
 
-
     int curr_index = min_idx;
-    
     double relative_node_x, relative_node_y;
     
     std::vector<int> indices;
@@ -703,14 +677,13 @@ void cropPointCloudHDMap(const typename pcl::PointCloud<PointT>::Ptr &cloudIn, t
         }
     }
     
-
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
 }
 
-void undistortPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, const Eigen::Quaterniond &rotation,
-                        pcl::PointCloud<PointXYZIT>::Ptr &cloudOut, double &time_taken)
+void undistortPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, const Eigen::Quaterniond &rotation, ros::Time input_stamp,
+                        double measure_time, pcl::PointCloud<PointXYZIT>::Ptr &cloudOut, double &time_taken)
 {
     auto start_time = std::chrono::steady_clock::now();
 
@@ -719,30 +692,30 @@ void undistortPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, const 
         return;
     }
 
-    // Convert the quaternion to SO3 for easier manipulation and calculate its inverse
     Sophus::SO3d final_so3(rotation);
     Sophus::SO3d inverse_so3 = final_so3.inverse();
 
-    // Process each point in the cloud
     cloudOut->clear();
-    cloudOut->points.resize(cloudIn->points.size());
-    // cloudOut->width = cloudIn->width;
-    // cloudOut->height = cloudIn->height;
-    // cloudOut->is_dense = cloudIn->is_dense;
+    cloudOut->reserve(cloudIn->size());
 
     for (size_t i = 0; i < cloudIn->points.size(); ++i) {
         const auto &pt = cloudIn->points[i];
         
-        // Apply the inverse rotation
+        double dt = pt.timestamp - input_stamp.toSec();
+        if (dt == 0) continue;
+
+        double ratio = dt / measure_time;
+        Sophus::SO3d scaled_so3 = Sophus::SO3d::exp(ratio * inverse_so3.log());
+
         Eigen::Vector3d pt_vec(pt.x, pt.y, pt.z);
-        Eigen::Vector3d rotated_pt = inverse_so3 * pt_vec;
+        Eigen::Vector3d rotated_pt = scaled_so3 * pt_vec;
 
         PointXYZIT new_point;
         new_point = pt;
         new_point.x = rotated_pt.x();
         new_point.y = rotated_pt.y();
         new_point.z = rotated_pt.z();
-        cloudOut->points[i] = new_point;
+        cloudOut->points.push_back(new_point);
     }
 
     auto end_time = std::chrono::steady_clock::now();
@@ -834,7 +807,6 @@ void EuclideanClustering(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudIn,
     time_taken = elapsed_seconds.count();
 }
 
-// 개발 중,,
 void adaptiveClustering(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudIn, 
                         std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &outputClusters, double &time_taken)
 {
@@ -957,7 +929,6 @@ void depthClustering(const pcl::PointCloud<PointType>::Ptr &cloudIn,
     time_taken = elapsed_seconds.count();
 }
 
-
 void fittingLShape(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &inputClusters, const ros::Time &input_stamp, 
                 jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken)
 {
@@ -986,7 +957,6 @@ void fittingLShape(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &input
 
         // Create jsk_recognition_msgs::BoundingBox
         jsk_recognition_msgs::BoundingBox bbox;
-        //bbox.header.stamp = ros::Time::now();
         bbox.header.stamp = input_stamp; // mingu
         bbox.header.frame_id = frameID;
         bbox.pose.position.x = rr.center.x;
@@ -1064,6 +1034,48 @@ void fittingPCA(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &inputClu
     time_taken = elapsed_seconds.count();
 }
 
+void cropBboxHDMap(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, 
+                    jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, 
+                    const ros::Time &input_stamp, tf2_ros::Buffer &tf_buffer, const std::string target_frame, 
+                    const std::string world_frame, const std::vector<std::pair<float, float>> &global_path, double &time_taken)
+{
+    auto start = std::chrono::steady_clock::now();
+
+    output_bbox_array.boxes.clear();
+
+    geometry_msgs::TransformStamped transformStamped;
+    try {
+        transformStamped = tf_buffer.lookupTransform(world_frame, target_frame, ros::Time(0)); // input_stamp
+    } catch (tf2::TransformException &ex) {
+        // ROS_WARN("%s", ex.what());
+        output_bbox_array = input_bbox_array;
+        return;
+    }
+
+    double min_distance_threshold = 5.0;  // 임의의 값, 필요에 따라 조정
+    for (const auto& box : input_bbox_array.boxes) {
+        geometry_msgs::Point transformed_point;
+        tf2::doTransform(box.pose.position, transformed_point, transformStamped);
+
+        bool within_range = false;
+        for (const auto& path_point : global_path) {
+            double distance = std::hypot(path_point.first - transformed_point.x, path_point.second - transformed_point.y);
+            if (distance <= radius) {
+                within_range = true;
+                break;
+            }
+        }
+
+        if (within_range) {
+            output_bbox_array.boxes.push_back(box);
+        }
+    }
+
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end - start;
+    time_taken = elapsed_seconds.count();
+}
+
 void integrationBbox(const jsk_recognition_msgs::BoundingBoxArray &cluster_bbox_array, 
                     const jsk_recognition_msgs::BoundingBoxArray &deep_bbox_array, 
                     jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken)
@@ -1099,24 +1111,24 @@ void integrationBbox(const jsk_recognition_msgs::BoundingBoxArray &cluster_bbox_
     time_taken = elapsed_seconds.count();
 }
 
-void tracking(Track &tracker, const jsk_recognition_msgs::BoundingBoxArray &bbox_array, 
-                jsk_recognition_msgs::BoundingBoxArray &track_bbox_array, visualization_msgs::MarkerArray &track_text_array,
+void tracking(Track &tracker, const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, 
+                jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, visualization_msgs::MarkerArray &output_text_array,
                 const ros::Time &stamp, double &time_taken)
 {
     auto start = std::chrono::steady_clock::now();
 
-    track_bbox_array.boxes.clear();
-    track_text_array.markers.clear();
+    output_bbox_array.boxes.clear();
+    output_text_array.markers.clear();
     // jsk_recognition_msgs::BoundingBoxArray filtered_bbox_array = tracker.filtering(cluster_bbox_array);
     tracker.predictNewLocationOfTracks();
-    tracker.assignDetectionsTracks(bbox_array);
-    tracker.assignedTracksUpdate(bbox_array, stamp);
+    tracker.assignDetectionsTracks(input_bbox_array);
+    tracker.assignedTracksUpdate(input_bbox_array, stamp);
     tracker.unassignedTracksUpdate();
     tracker.deleteLostTracks();
-    tracker.createNewTracks(bbox_array);
+    tracker.createNewTracks(input_bbox_array);
     pair<jsk_recognition_msgs::BoundingBoxArray, visualization_msgs::MarkerArray> bbox = tracker.displayTrack();
-    track_bbox_array = bbox.first;
-    track_text_array = bbox.second;
+    output_bbox_array = bbox.first;
+    output_text_array = bbox.second;
 
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
@@ -1175,9 +1187,7 @@ void correctionBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_arr
 
     try {
         transformStampedAtStamp = tf_buffer.lookupTransform(world_frame, target_frame, input_stamp);
-        //transformStampedAtStamp = tf_buffer.lookupTransform(world_frame, target_frame, input_stamp);
         transformStampedAtInput = tf_buffer.lookupTransform(world_frame, target_frame, ros::Time(0)); // 변환에 약 0.1초 시간이 좀 걸림
-        
         //compareTransforms(transformStampedAtInput, transformStampedAtStamp);
 
     } catch (tf2::TransformException &ex) {

@@ -12,7 +12,8 @@ std::string fixed_frame;
 
 tf2_ros::Buffer tf_buffer;
 
-jsk_recognition_msgs::BoundingBoxArray cluster_bbox_array, deep_bbox_array, integration_bbox_array, track_bbox_array, transformed_bbox_array, corrected_bbox_array, output_bbox_array;
+jsk_recognition_msgs::BoundingBoxArray cluster_bbox_array, deep_bbox_array, integration_bbox_array, 
+                        track_bbox_array, transformed_bbox_array, corrected_bbox_array, output_bbox_array;
 visualization_msgs::MarkerArray track_text_array, track_model_array;
 
 // clustering이 더 오래 걸려서 callbackCluster에서 integration
@@ -30,10 +31,7 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
         fixed_frame = target_frame;
         output_bbox_array = corrected_bbox_array;
     }
-    else {
-        fixed_frame = frameID;
-        output_bbox_array = track_bbox_array;
-    }
+    else { fixed_frame = frameID; output_bbox_array = track_bbox_array; }
     
     pub_track_box.publish(bba2msg(output_bbox_array, ros::Time::now(), fixed_frame));
     pub_track_model.publish(bba2ma(output_bbox_array, ros::Time::now(), fixed_frame));
@@ -41,12 +39,12 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
     
     total = ros::Time::now().toSec() - cluster_bbox_array.boxes[0].header.stamp.toSec();
 
-    // std::cout << "\033[" << 17 << ";" << 30 << "H" << std::endl;
-    // std::cout << "integration : " << t8 << "sec" << std::endl;
-    // std::cout << "tracking : " << t9 << "sec" << std::endl;
-    // std::cout << "transform & correction : " << t10+t11 << "sec" << std::endl;
-    // std::cout << "total : " << total << " sec" << std::endl;
-    // std::cout << "fixed frame : " << fixed_frame << std::endl;
+    std::cout << "\033[" << 19 << ";" << 30 << "H" << std::endl;
+    std::cout << "integration : " << t8 << "sec" << std::endl;
+    std::cout << "tracking : " << t9 << "sec" << std::endl;
+    std::cout << "transform & correction : " << t10+t11 << "sec" << std::endl;
+    std::cout << "total : " << total << " sec" << std::endl;
+    std::cout << "fixed frame : " << fixed_frame << std::endl;
 }
 
 void callbackDeep(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)

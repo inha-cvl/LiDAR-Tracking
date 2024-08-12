@@ -26,7 +26,7 @@ ros::Publisher pub_cluster_box;
 ros::Publisher pub_test;
 
 vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> cluster_array;
-jsk_recognition_msgs::BoundingBoxArray cluster_bbox_array;
+jsk_recognition_msgs::BoundingBoxArray cluster_bbox_array, filtered_bbox_array, output_bbox_array;
 
 std::vector<std::pair<float, float>> global_path;
 tf2_ros::Buffer tf_buffer;
@@ -37,7 +37,7 @@ const size_t MAX_IMU_BUFFER_SIZE = 1000;
 Eigen::Quaterniond rotation = Eigen::Quaterniond(1, 0, 0, 0);
 
 ros::Time input_stamp, rotation_stamp;
-double t1,t2,t3,t4,t5,t6,t7;
+double measure_time, t1,t2,t3,t4,t5,t6,t7,t8;
 
 std::vector<double> times_t1, times_t2, times_t3, times_t4, times_t5, times_t6, times_t7;
 
@@ -73,10 +73,10 @@ void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
     
     // projectPointCloud(fullCloud, projectionCloud, t2); // projection
     // pub_projection_cloud.publish(cloud2msg(*projectionCloud, ros::Time::now(), frameID));
-    // convertPointCloudToImage(projectionCloud, projectionImage);
+    // convertPointCloudToImage(projectionCloud, projectionImage, t3);
     // pub_projection_image.publish(image2msg(projectionImage, ros::Time::now(), frameID));
 
-    cropPointCloud(fullCloud, cropCloud, t3); // crop
+    cropPointCloud(fullCloud, cropCloud, t4); // crop
     //pub_crop_cloud.publish(cloud2msg(*cropCloud, input_stamp, frameID));
 
     // pcl::PointCloud<pcl::PointXYZ>::Ptr tempCloud(new pcl::PointCloud<pcl::PointXYZ>);
@@ -86,8 +86,8 @@ void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
 
     PatchworkppGroundSeg->estimate_ground(*cropCloud, *groundCloud, *nonGroundCloud, t4); // ground removal
     // pub_ground.publish(cloud2msg(*groundCloud, input_stamp, frameID));
-    // pub_non_ground.publish(cloud2msg(*nonGroundCloud, input_stamp, frameID));
-    undistortPointCloud(nonGroundCloud, rotation, undistortionCloud, t1);
+    pub_non_ground.publish(cloud2msg(*nonGroundCloud, input_stamp, frameID));
+    undistortPointCloud(nonGroundCloud, rotation, input_stamp, 0.05, undistortionCloud, t1);
     pub_undistortion_cloud.publish(cloud2msg(*undistortionCloud, input_stamp, frameID)); // detection 전달 때문에 input_stamp 사용
     // depthClustering(nonGroundCloud, cluster_array, t6);
     downsamplingPointCloud(undistortionCloud, downsamplingCloud, t5); // downsampling
@@ -97,16 +97,27 @@ void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
     adaptiveClustering(downsamplingCloud, cluster_array, t6);
     //EuclideanClustering(downsamplingCloud, cluster_array, t6); // clustering
     fittingLShape(cluster_array, input_stamp, cluster_bbox_array, t7); // L shape fitting
-    pub_cluster_box.publish(bba2msg(cluster_bbox_array, input_stamp, frameID)); // input_stamp
-
-    // std::cout << "undistortion : " << t1 << " sec" << std::endl;
-    // std::cout << "projection : " << t2 << " sec" << std::endl;
-    // std::cout << "crop : " << t3 << " sec" << std::endl;
-    // std::cout << "ground removal : " << t4 << " sec" << std::endl;
-    // std::cout << "downsampling : " << t5 << " sec" << std::endl;
-    // std::cout << "clustering : " << t6 << " sec" << std::endl;
-    // std::cout << "Lshape fitting : " << t7 << " sec" << std::endl;
+    
+    // 검증 필요
+    if (global_path.size() == 0) { output_bbox_array = cluster_bbox_array; }
+    else {
+        cropBboxHDMap(cluster_bbox_array, filtered_bbox_array, input_stamp, tf_buffer, target_frame, world_frame, global_path, t8);
+        output_bbox_array = filtered_bbox_array;
+    }
+    pub_cluster_box.publish(bba2msg(output_bbox_array, input_stamp, frameID)); // input_stamp
+    
+    std::cout << "\033[2J" << "\033[" << 10 << ";" << 30 << "H" << std::endl;
+    std::cout << "undistortion : " << t1 << " sec" << std::endl;
+    std::cout << "projection : " << t2 << " sec" << std::endl;
+    std::cout << "convert to image : " << t3 << " sec" << std::endl;
+    std::cout << "crop : " << t4 << " sec" << std::endl;
+    std::cout << "ground removal : " << t4 << " sec" << std::endl;
+    std::cout << "downsampling : " << t5 << " sec" << std::endl;
+    std::cout << "clustering : " << t6 << " sec" << std::endl;
+    std::cout << "Lshape fitting : " << t7 << " sec" << std::endl;
+    std::cout << "filtering : " << t8 << " sec" << std::endl;
 }
+
 int main(int argc, char**argv) {
 
     ros::init(argc, argv, "cloud_segmentation");
@@ -114,9 +125,7 @@ int main(int argc, char**argv) {
     ros::NodeHandle pnh("~");
     tf2_ros::TransformListener tf_listener(tf_buffer);
 
-    cout << "Operating cloud segementation..." << endl;
     global_path = map_reader();
-    //map_reader(global_path);
     PatchworkppGroundSeg.reset(new PatchWorkpp<PointType>(&pnh));
 
     pub_undistortion_cloud = pnh.advertise<sensor_msgs::PointCloud2>("undistortioncloud", 1, true);
