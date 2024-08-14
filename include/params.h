@@ -38,10 +38,10 @@ float clusterTolerance = 0.3; // 더 올리면 전방 차량 클러스터링 못
 int minSize = 10;
 int maxSize = 2000; // hesai 기준으로 이 정도는 해야 버스 인식
 // Depth Clustering
-float vertical_resolution = 5.0f; // 가상의 수직 해상도
-float horizontal_resolution = 1.5f; // 가상의 수평 해상도
-int lidar_lines = 64; // LiDAR 라인 수
-int cluster_size = 3; // 최소 클러스터 크기
+// float vertical_resolution = 5.0f; // 가상의 수직 해상도
+// float horizontal_resolution = 1.5f; // 가상의 수평 해상도
+// int lidar_lines = 128; // LiDAR 라인 수
+// int cluster_size = 3; // 최소 클러스터 크기
 // Adaptive Clustering
 float start_tolerance = 0.2;
 float delta_tolerance = 0.16;

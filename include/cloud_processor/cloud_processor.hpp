@@ -1,498 +1,220 @@
-#include <ros/ros.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <sensor_msgs/Image.h>
-#include <geometry_msgs/TransformStamped.h>
-#include <tf2_eigen/tf2_eigen.h>
-#include <tf2_ros/transform_listener.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#include <tf/tf.h>
+#include "utils.hpp"
 
-#include <pcl/common/common.h>
-#include <pcl/filters/voxel_grid.h>
-#include <pcl/segmentation/extract_clusters.h>
-#include <pcl_conversions/pcl_conversions.h>
+template <typename PointT>
+class CloudProcessor {
+public:
+    CloudProcessor() {};
 
-#include <cv_bridge/cv_bridge.h>
-#include <opencv2/opencv.hpp>
-
-#include <jsoncpp/json/json.h>
-
-#include "params.h"
-#include "undistortion/data_process/data_process.h"
-#include "patchworkpp/patchworkpp.hpp"
-#include "lshape/lshaped_fitting.h"
-#include "track/track.h"
-#include "depth_clustering/depth_cluster.h"
-
-template<typename PointT>
-sensor_msgs::PointCloud2 cloud2msg(const pcl::PointCloud<PointT> &cloud, 
-                                    const ros::Time &stamp, const std::string &frame_id)
-{
-    sensor_msgs::PointCloud2 cloud_ROS;
-    pcl::toROSMsg(cloud, cloud_ROS);
-    cloud_ROS.header.stamp = stamp;
-    cloud_ROS.header.frame_id = frame_id;
-    return cloud_ROS;
-}
-
-sensor_msgs::ImagePtr image2msg(const cv::Mat& image, const ros::Time &stamp, const std::string &frame_id)
-{
-    cv_bridge::CvImage cv_image;
-    cv_image.header.stamp = stamp; 
-    cv_image.header.frame_id = frame_id;
-    cv_image.encoding = "mono8"; 
-    cv_image.image = image;
-    return cv_image.toImageMsg();
-}
-
-jsk_recognition_msgs::BoundingBoxArray bba2msg(const jsk_recognition_msgs::BoundingBoxArray bba, 
-                                                const ros::Time &stamp, const std::string &frame_id)
-{
-    jsk_recognition_msgs::BoundingBoxArray bba_ROS;
-    bba_ROS.header.stamp = stamp;
-    bba_ROS.header.frame_id = frame_id;
-    bba_ROS.boxes = bba.boxes;
-    return bba_ROS;
-}
-
-visualization_msgs::MarkerArray ta2msg(const visualization_msgs::MarkerArray& ta, 
-                                        const ros::Time &stamp, const std::string &frame_id)
-{
-    visualization_msgs::MarkerArray ta_ROS;
-    for (const auto& marker : ta.markers)
-    {
-        visualization_msgs::Marker temp_marker = marker;
-        temp_marker.header.stamp = stamp;     
-        temp_marker.header.frame_id = frame_id;
-        temp_marker.lifetime = ros::Duration(0.2);
-        ta_ROS.markers.push_back(temp_marker);
+    CloudProcessor(ros::NodeHandle& nh) : nh_(nh) {
+        nh_.getParam("lidar_settings/V_SCAN", V_SCAN);
+        nh_.getParam("lidar_settings/H_SCAN", H_SCAN);
+        nh_.getParam("lidar_settings/ang_res_x", ang_res_x);
+        nh_.getParam("lidar_settings/ang_res_y", ang_res_y);
+        nh_.getParam("lidar_settings/ang_bottom", ang_bottom);
+        nh_.getParam("downsampling/leaf_size/x", leaf_size_x);
+        nh_.getParam("downsampling/leaf_size/y", leaf_size_y);
+        nh_.getParam("downsampling/leaf_size/z", leaf_size_z);
+        nh_.getParam("clustering/filter/min_size/x", filter_min_size_x);
+        nh_.getParam("clustering/filter/min_size/y", filter_min_size_y);
+        nh_.getParam("clustering/filter/min_size/z", filter_min_size_z);
+        nh_.getParam("clustering/filter/max_size/x", filter_max_size_x);
+        nh_.getParam("clustering/filter/max_size/y", filter_max_size_y);
+        nh_.getParam("clustering/filter/max_size/z", filter_max_size_z);
+        nh_.getParam("clustering/adaptive/min_size", adaptive_min_size);
+        nh_.getParam("clustering/adaptive/max_size", adaptive_max_size);
+        nh_.getParam("clustering/adaptive/start_tolerance", start_tolerance);
+        nh_.getParam("clustering/adaptive/delta_tolerance", delta_tolerance);
+        nh_.getParam("clustering/adaptive/max_region", max_region);
+        nh_.getParam("clustering/adaptive/number_region", number_region);
+        nh_.getParam("clustering/adaptive/threshIOU", threshIOU);
+        nh_.getParam("clustering/L_shape_fitting/projection_range", projection_range);
+        nh_.getParam("ROI/crop/max/x", roi_max_x);
+        nh_.getParam("ROI/crop/max/y", roi_max_y);
+        nh_.getParam("ROI/crop/max/z", roi_max_z);
+        nh_.getParam("ROI/crop/min/x", roi_min_x);
+        nh_.getParam("ROI/crop/min/y", roi_min_y);
+        nh_.getParam("ROI/crop/min/z", roi_min_z);
+        nh_.getParam("ROI/crop/crop_ring/enabled", crop_ring_enabled);
+        nh_.getParam("ROI/crop/crop_ring/ring", crop_ring);
+        nh_.getParam("ROI/crop/crop_intensity/enabled", crop_intensity_enabled);
+        nh_.getParam("ROI/crop/crop_intensity/intensity", crop_intensity);
+        nh_.getParam("ROI/crop/crop_hd_map/radius", crop_hd_map_radius);
     }
 
-    return ta_ROS;
+    void msgToPointCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg, pcl::PointCloud<PointT>& cloud);
+    void imuUpdate(const sensor_msgs::Imu::ConstPtr &imu_msg);
+    void projectPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double &time_taken);
+    void convertPointCloudToImage(const pcl::PointCloud<PointT>& cloudIn, cv::Mat &imageOut, double &time_taken);
+    void cropPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double &time_taken);
+    void cropPointCloudHDMap(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, 
+                    tf2_ros::Buffer &tf_buffer, const std::string target_frame, const std::string world_frame, 
+                    const std::vector<std::pair<float, float>> &global_path, double &time_taken);    
+    void undistortPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double &time_taken);
+    void downsamplingPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<pcl::PointXYZ>& cloudOut, double &time_taken);
+    void adaptiveClustering(const pcl::PointCloud<pcl::PointXYZ>& cloudIn, std::vector<pcl::PointCloud<pcl::PointXYZ>>& outputClusters, double &time_taken);
+    void voxelClustering(const pcl::PointCloud<PointT>& cloudIn, std::vector<pcl::PointCloud<pcl::PointXYZ>>& outputClusters, double& time_taken);
+    void fittingLShape(const std::vector<pcl::PointCloud<pcl::PointXYZ>>& inputClusters, const std::string lidar_frame,
+                        jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken);
+
+private:
+    ros::NodeHandle nh_;
+    int V_SCAN; // Vertical scan lines
+    int H_SCAN; // Horizontal scan points per line
+    float ang_res_x; // Angular resolution in x direction (degrees)
+    float ang_res_y; // Angular resolution in y direction (degrees)
+    int ang_bottom; // Bottom angle (degrees)
+
+    // Downsampling parameters
+    float leaf_size_x; // Leaf size for downsampling in x dimension
+    float leaf_size_y; // Leaf size for downsampling in y dimension
+    float leaf_size_z; // Leaf size for downsampling in z dimension
+
+    // Clustering filter settings
+    float filter_min_size_x; // Minimum size in x dimension for clustering
+    float filter_min_size_y; // Minimum size in y dimension for clustering
+    float filter_min_size_z; // Minimum size in z dimension for clustering
+    float filter_max_size_x; // Maximum size in x dimension for clustering
+    float filter_max_size_y; // Maximum size in y dimension for clustering
+    float filter_max_size_z; // Maximum size in z dimension for clustering
+
+    // Adaptive clustering settings
+    int adaptive_min_size; // Minimum cluster size in points
+    int adaptive_max_size; // Maximum cluster size in points
+    float start_tolerance; // Start tolerance for clustering
+    float delta_tolerance; // Delta tolerance increment in clustering
+    int max_region; // Maximum regions for clustering
+    int number_region; // Number of regions for adaptive clustering
+    float threshIOU; // Intersection over Union threshold for clustering
+
+    // L-shape fitting parameters
+    float projection_range; // Projection range for L-shape fitting
+
+    // Region of Interest (ROI) settings
+    float roi_max_x; // Maximum x dimension for ROI
+    float roi_max_y; // Maximum y dimension for ROI
+    float roi_max_z; // Maximum z dimension for ROI
+    float roi_min_x; // Minimum x dimension for ROI
+    float roi_min_y; // Minimum y dimension for ROI
+    float roi_min_z; // Minimum z dimension for ROI
+    bool crop_ring_enabled; // Enable cropping by ring number
+    int crop_ring; // Specific ring number to crop
+    bool crop_intensity_enabled; // Enable cropping by intensity
+    float crop_intensity; // Intensity threshold for cropping
+    float crop_hd_map_radius; // Radius for HD map-based cropping
+
+    // lidar
+    ros::Time cur_stamp = ros::Time(0);
+    ros::Time pre_stamp = ros::Time(0);
+    double interval = 0.05;
+
+    // imu
+    double last_timestamp_imu = -1;
+    std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer;
+    const size_t MAX_IMU_BUFFER_SIZE = 1000;
+    Eigen::Quaterniond rotation = Eigen::Quaterniond(1, 0, 0, 0);
+    ros::Time rotation_stamp;
+};
+
+template<typename PointT> inline
+void CloudProcessor<PointT>::msgToPointCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg, pcl::PointCloud<PointT>& cloud)
+{
+    pcl::fromROSMsg(*cloud_msg, cloud);
+    pre_stamp = cur_stamp;
+    cur_stamp = cloud_msg->header.stamp;
+    interval = cur_stamp.toSec() - pre_stamp.toSec();
 }
 
-// label에 따라 모델 다른 거 적용 예정, car 말고는 dae 파일이 없음
-visualization_msgs::MarkerArray bba2ma(const jsk_recognition_msgs::BoundingBoxArray &bba, 
-                                        const ros::Time &stamp, const std::string &frame_id) 
+template<typename PointT> inline
+void CloudProcessor<PointT>::imuUpdate(const sensor_msgs::Imu::ConstPtr &imu_msg)
 {
-    visualization_msgs::MarkerArray marker_array;
+    double timestamp = imu_msg->header.stamp.toSec();
+    // ROS_DEBUG("get imu at time: %.6f", timestamp);
 
-    for (size_t i = 0; i < bba.boxes.size(); ++i) {
-        const auto& bbox = bba.boxes[i];
-        
-        visualization_msgs::Marker marker;
-        marker.header.frame_id = frame_id;
-        marker.lifetime = ros::Duration(0.1);
-        marker.header.stamp = stamp;
-        marker.ns = "model";
-        marker.id = i;
-        marker.action = visualization_msgs::Marker::ADD;
-        marker.pose.position = bbox.pose.position;
-
-        // 1 : Car, 2 : Truck, 3 : Motorcycle
-        if (bbox.label == 1)
-        {
-            marker.type = visualization_msgs::Marker::MESH_RESOURCE;
-            marker.mesh_resource = "package://lidar_tracking/urdf/car.dae";
-            marker.scale.x = 1.7;
-            marker.scale.y = 2.1;
-            marker.scale.z = 1.6;
-            marker.color.r = 0.5;
-            marker.color.g = 0.5;
-            marker.color.b = 0.5;
-            marker.color.a = 2.0;
-        }
-        else if (bbox.label == 2)
-        {
-            marker.type = visualization_msgs::Marker::SPHERE;
-            marker.scale = bbox.dimensions;
-            marker.color.r = 0.0;
-            marker.color.g = 0.0;
-            marker.color.b = 1.0;
-            marker.color.a = 0.0;
-        }
-        else if (bbox.label == 3)
-        {
-            marker.type = visualization_msgs::Marker::SPHERE;
-            marker.scale.x = 1.5;
-            marker.scale.y = 1.5;
-            marker.scale.z = 1.5;
-            marker.color.r = 1.0;
-            marker.color.g = 1.0;
-            marker.color.b = 0.0;
-            marker.color.a = 1.0;
-        }
-        else
-        {
-            marker.type = visualization_msgs::Marker::SPHERE;
-            marker.scale.x = 1.5;
-            marker.scale.y = 1.5;
-            marker.scale.z = 1.5;
-            marker.color.r = 1.0;
-            marker.color.g = 1.0;
-            marker.color.b = 1.0;
-            marker.color.a = 1.0;
-        }
-        
-        tf::Quaternion q_rot(0, 0, M_SQRT1_2, M_SQRT1_2);
-        marker.pose.orientation = tf::createQuaternionMsgFromYaw(tf::getYaw(bbox.pose.orientation) + M_PI_2); // dae를 Pandar64 좌표계로 회전
-
-        marker_array.markers.push_back(marker);
+    if (timestamp < last_timestamp_imu) {
+        ROS_ERROR("imu loop back, clear buffer");
+        imu_buffer.clear();
     }
 
-    return marker_array;
-}
+    last_timestamp_imu = timestamp;
 
-double getBBoxOverlap(jsk_recognition_msgs::BoundingBox bbox1, jsk_recognition_msgs::BoundingBox bbox2)
-{
-	double boxA[4] = {bbox1.pose.position.x - bbox1.dimensions.x/2.0, 
-					 bbox1.pose.position.y - bbox1.dimensions.y/2.0, 
-					 bbox1.pose.position.x + bbox1.dimensions.x/2.0, 
-					 bbox1.pose.position.y + bbox1.dimensions.y/2.0};
- 	double boxB[4] = {bbox2.pose.position.x - bbox2.dimensions.x/2.0, 
-					 bbox2.pose.position.y - bbox2.dimensions.y/2.0, 
-					 bbox2.pose.position.x + bbox2.dimensions.x/2.0, 
-					 bbox2.pose.position.y + bbox2.dimensions.y/2.0};
-	double xA = std::max(boxA[0], boxB[0]);
-	double yA = std::max(boxA[1], boxB[1]);
-	double xB = std::min(boxA[2], boxB[2]);
-	double yB = std::min(boxA[3], boxB[3]);
+    imu_buffer.push_back(imu_msg);
 
-	double interArea = max(0.0, xB - xA + 1) * max(0.0, yB - yA + 1);
- 	double boxAArea = (boxA[2] - boxA[0] + 1) * (boxA[3] - boxA[1] + 1);
+    if (cur_stamp != rotation_stamp) {
+        rotation = calculateRotationBetweenStamps(imu_buffer, pre_stamp, cur_stamp);
+    }
 
-	double overlap = interArea / boxAArea;
-
-	return overlap;
-}
-
-std::vector<cv::Point2f> pcl2Point2f(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud)
-{
-    std::vector<cv::Point2f> points;
-    points.reserve(cloud->size());
-
-    pcl::PointXYZ minPoint, maxPoint;
-    pcl::getMinMax3D(*cloud, minPoint, maxPoint);
-    double center_z = (minPoint.z + maxPoint.z) / 2;
+    if (imu_buffer.size() > MAX_IMU_BUFFER_SIZE) { imu_buffer.pop_front(); }
     
-    for (const auto& point : *cloud)
-    {
-        if ( (point.z < center_z + projection_range && point.z > center_z - projection_range) ||
-              point.z > maxPoint.z - projection_range || point.z < minPoint.z + projection_range )
-        {
-            // Extract x and y coordinates from PointXYZI and create a cv::Point2f
-            cv::Point2f point2f(point.x, point.y);
-            points.push_back(point2f);
-        }
-        // cv::Point2f point2f(point.x, point.y);
-        // points.push_back(point2f);
-    }
-    
-    
-    return points;
+    rotation_stamp = cur_stamp;
 }
 
-Eigen::Quaterniond calculateRotationBetweenStamps(const std::deque<sensor_msgs::Imu::ConstPtr>& imu_buffer,
-                                                const ros::Time& last_stamp, const ros::Time& input_stamp) 
-{
-
-    Eigen::Quaterniond rotation_increment = Eigen::Quaterniond::Identity();
-
-    for (const auto& imu : imu_buffer) {
-        ros::Time imu_time = imu->header.stamp;
-        if (imu_time > last_stamp && imu_time <= input_stamp) {
-            auto it = std::find(imu_buffer.begin(), imu_buffer.end(), imu);
-            if (it != imu_buffer.begin()) {
-                auto prev_it = std::prev(it);
-                double dt = (imu_time - (*prev_it)->header.stamp).toSec();
-                Eigen::Vector3d angular_velocity(imu->angular_velocity.x,
-                                                 imu->angular_velocity.y,
-                                                 imu->angular_velocity.z);
-                Eigen::Quaterniond delta_rotation(
-                    Eigen::AngleAxisd(angular_velocity.norm() * dt, angular_velocity.normalized())
-                );
-                rotation_increment = delta_rotation * rotation_increment; // 순서가 중요
-            }
-        }
-    }
-
-    return rotation_increment;
-}
-
-#include <ros/package.h>
-std::vector<std::pair<float, float>> map_reader()
-{
-    Json::Value root;      
-    Json::Reader reader;
-    std::vector<std::pair<float, float>> global_path;
-    std::string index;
-
-    // ROS 패키지 경로 얻기
-    std::string package_path = ros::package::getPath("lidar_tracking");
-    std::string json_file_path = package_path + "/map/kiapi.json";  // 상대 경로 사용
-
-    std::ifstream t(json_file_path);
-    if (!t.is_open()) {
-        std::cout << "Failed to open file: " << json_file_path << std::endl;
-        return global_path;
-    }
-
-    if (!reader.parse(t, root)) {
-        std::cout << "Parsing Failed" << std::endl;
-        return global_path;
-    }
-
-    for (int k = 0; k < root.size(); ++k) {
-        index = std::to_string(k);
-        double x = root[index][0].asDouble();
-        double y = root[index][1].asDouble();
-        global_path.emplace_back(x, y);
-    }
-    
-    std::cout << "Global Path Created: " << global_path.size() << std::endl;
-    
-    return global_path;
-}
-/*
-std::vector<std::pair<float, float>> map_reader()
-{
-    Json::Value root;      
-    Json::Reader reader;
-    std::ifstream t;
-    std::vector<std::pair<float, float>> global_path;
-    string index;
-    //std::ifstream t(path);
-    t.open("/home/q/catkin_ws/src/LiDAR-Tracking/map/kiapi.json");
-    if (!reader.parse(t, root)) {
-        cout << "Parsing Failed" << endl;
-    }
-    for (int k=0;k<root.size();++k){
-        index = to_string(k);
-        double x = root[index][0].asDouble();
-        double y = root[index][1].asDouble();
-        global_path.emplace_back(x, y);
-    }
-    std::cout << "Global Path Created : " << global_path.size() << std::endl;
-    // curr_index = 0;
-
-    return global_path;
-}
-*/
-void transformMsgToEigen(const geometry_msgs::Transform &transform_msg, Eigen::Affine3f &transform) 
-{  
-    transform =
-        Eigen::Translation3f(transform_msg.translation.x,
-                             transform_msg.translation.y,
-                             transform_msg.translation.z) *
-        Eigen::Quaternionf(transform_msg.rotation.w, transform_msg.rotation.x,
-                           transform_msg.rotation.y, transform_msg.rotation.z);
-}
-
-bool checkTransform(tf2_ros::Buffer &tf_buffer, const std::string &lidar_frame, const std::string &target_frame)
-{
-    try {
-        geometry_msgs::TransformStamped TransformStamped = tf_buffer.lookupTransform(target_frame, lidar_frame, ros::Time(0));
-        return true;
-    }
-    catch (tf2::TransformException &ex) {
-        return false;
-    }
-}
-
-void compareTransforms(const geometry_msgs::TransformStamped &transform1, 
-                        const geometry_msgs::TransformStamped &transform2) 
-{
-    ROS_INFO("Comparing transforms:");
-
-    // Print translation of transform1 and transform2
-    ROS_INFO("Transform 1 - Translation: x = %f, y = %f, z = %f",
-             transform1.transform.translation.x,
-             transform1.transform.translation.y,
-             transform1.transform.translation.z);
-
-    ROS_INFO("Transform 2 - Translation: x = %f, y = %f, z = %f",
-             transform2.transform.translation.x,
-             transform2.transform.translation.y,
-             transform2.transform.translation.z);
-
-    // Print rotation of transform1 and transform2
-    ROS_INFO("Transform 1 - Rotation: x = %f, y = %f, z = %f, w = %f",
-             transform1.transform.rotation.x,
-             transform1.transform.rotation.y,
-             transform1.transform.rotation.z,
-             transform1.transform.rotation.w);
-
-    ROS_INFO("Transform 2 - Rotation: x = %f, y = %f, z = %f, w = %f",
-             transform2.transform.rotation.x,
-             transform2.transform.rotation.y,
-             transform2.transform.rotation.z,
-             transform2.transform.rotation.w);
-
-    // Compare translations
-    if (std::abs(transform1.transform.translation.x - transform2.transform.translation.x) < 1e-3 &&
-        std::abs(transform1.transform.translation.y - transform2.transform.translation.y) < 1e-3 &&
-        std::abs(transform1.transform.translation.z - transform2.transform.translation.z) < 1e-3) {
-        ROS_INFO("Translations are identical.");
-    } else {
-        ROS_INFO("Translations are different.");
-    }
-
-    // Compare rotations
-    if (std::abs(transform1.transform.rotation.x - transform2.transform.rotation.x) < 1e-3 &&
-        std::abs(transform1.transform.rotation.y - transform2.transform.rotation.y) < 1e-3 &&
-        std::abs(transform1.transform.rotation.z - transform2.transform.rotation.z) < 1e-3 &&
-        std::abs(transform1.transform.rotation.w - transform2.transform.rotation.w) < 1e-3) {
-        ROS_INFO("Rotations are identical.");
-    } else {
-        ROS_INFO("Rotations are different.");
-    }
-}
-
-// hesai
-/*
-void projectPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, 
-                        pcl::PointCloud<PointXYZIT>::Ptr &cloudOut, double &time_taken)
+template<typename PointT> inline
+void CloudProcessor<PointT>::projectPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double& time_taken) 
 {
     auto start = std::chrono::steady_clock::now();
 
-    cloudOut -> clear();
-    cloudOut->points.resize(V_SCAN * H_SCAN);
-
-    float verticalAngle, horizonAngle;
-    size_t rowIdn, columnIdn, index;
-    PointXYZIT outPoint;
-    
-    for (const auto& inPoint : cloudIn->points)
-    {   
-        outPoint = inPoint;
-        outPoint.x = -inPoint.y;
-        outPoint.y = inPoint.x;
-
-        verticalAngle = atan2(outPoint.z, sqrt(outPoint.x * outPoint.x + outPoint.y * outPoint.y)) * 180 / M_PI;
-
-        if (verticalAngle < -19){
-            rowIdn = (verticalAngle + ang_bottom) / 6;
-        }
-        else if (verticalAngle < -14){
-            rowIdn = (verticalAngle + ang_bottom - 6) / 5 + 2;
-        }
-        else if (verticalAngle < -6){
-            rowIdn = (verticalAngle + ang_bottom - 11) / 1 + 3;
-        }
-        else if (verticalAngle < 2){
-            rowIdn = (verticalAngle + ang_bottom - 19) / 0.167 + 11;
-        }
-        else if (verticalAngle < 3){
-            rowIdn = (verticalAngle + ang_bottom - 27) / 1 + 59;
-        }
-        else if (verticalAngle < 5){
-            rowIdn = (verticalAngle + ang_bottom - 28) / 2 + 60;
-        }
-        else if (verticalAngle < 11){
-            rowIdn = (verticalAngle + ang_bottom - 30) / 3 + 61;
-        }
-        else
-        {
-            rowIdn = (verticalAngle + ang_bottom - 36) / 4 + 63;
-        }
-
-        if (rowIdn < 0 || rowIdn >= V_SCAN)
-            continue;
-
-        horizonAngle = atan2(outPoint.x, outPoint.y) * 180 / M_PI;
-        columnIdn = -round((horizonAngle - 90.0) / ang_res_x) + H_SCAN / 2;
-
-        if (columnIdn >= H_SCAN)
-            columnIdn -= H_SCAN;
-
-        if (columnIdn < 0 || columnIdn >= H_SCAN)
-            continue;
-
-        index = columnIdn + rowIdn * H_SCAN;
-
-        cloudOut->points[index] = outPoint;
-    }
-    
-    auto end = std::chrono::steady_clock::now();
-    std::chrono::duration<double> elapsed_seconds = end - start;
-    time_taken = elapsed_seconds.count();
-}
-*/
-
-void projectPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, 
-                        pcl::PointCloud<PointXYZIT>::Ptr &cloudOut, double &time_taken)
-{
-    auto start = std::chrono::steady_clock::now();
-
-    if (cloudIn->points.empty()) {
+    if (cloudIn.points.empty()) {
         std::cerr << "Input cloud is empty! <- projectPointCloud" << std::endl;
         return;
     }
 
-    cloudOut->clear();
-    cloudOut->points.resize(V_SCAN * H_SCAN);
+    cloudOut.clear();
+    cloudOut.reserve(cloudIn.size());
+    //cloudOut.points.resize(V_SCAN * H_SCAN, PointT());
 
-    float verticalAngle, horizonAngle;
-    size_t rowIdn, columnIdn, index;
-    
-    for (const auto& inPoint : cloudIn->points)
-    {   
-        verticalAngle = atan2(inPoint.z, sqrt(inPoint.x * inPoint.x + inPoint.y * inPoint.y)) * 180 / M_PI;
+    std::vector<float> channelAngles = {14.985, 13.283, 11.758, 10.483, 9.836, 9.171, 8.496, 7.812, 7.462, 7.115, 6.767, 6.416, 6.064, 5.71,
+                                        5.355, 4.998, 4.643, 4.282, 3.921, 3.558, 3.194, 2.829, 2.463, 2.095, 1.974, 1.854, 1.729, 1.609, 1.487, 1.362, 1.242, 1.12, 0.995, 0.875, 0.75,
+                                        0.625, 0.5, 0.375, 0.25, 0.125, 0, -0.125, -0.25, -0.375, -0.5, -0.626, -0.751, -0.876, -1.001, -1.126, -1.251,
+                                        -1.377, -1.502, -1.627, -1.751, -1.876, -2.001, -2.126, -2.251, -2.376, -2.501, -2.626, -2.751, -2.876, -3.001, -3.126, -3.251, -3.376, -3.501,
+                                        -3.626, -3.751, -3.876, -4.001, -4.126, -4.25, -4.375, -4.501, -4.626, -4.751, -4.876, -5.001, -5.126, -5.252, -5.377, -5.502, -5.626, -5.752,
+                                        -5.877, -6.002, -6.378, -6.754, -7.13, -7.507, -7.882, -8.257, -8.632, -9.003, -9.376, -9.749, -10.121, -10.493, -10.864, -11.234, -11.603, -11.975,
+                                        -12.343, -12.709, -13.075, -13.439, -13.803, -14.164, -14.525, -14.879, -15.237, -15.593, -15.948, -16.299, -16.651, -17, -17.347, -17.701, -18.386,
+                                        -19.063, -19.73, -20.376, -21.653, -23.044, -24.765};
 
-        if (verticalAngle >= -25 && verticalAngle < -14) {
-            rowIdn = (verticalAngle + 25) / 1.2;
-        } else if (verticalAngle < -6) {
-            rowIdn = 4 + (verticalAngle + 14) / 0.67;
-        } else if (verticalAngle < -0.25) {
-            rowIdn = 8 + (verticalAngle + 6) / 0.36;
-        } else if (verticalAngle < 15) {
-            rowIdn = 24 + (verticalAngle + 0.25) / 0.125;
-        } else {
-            continue;
+    for (const auto& inPoint : cloudIn.points) {
+        float verticalAngle = atan2(inPoint.z, sqrt(inPoint.x * inPoint.x + inPoint.y * inPoint.y)) * 180 / M_PI;
+
+        // Find the closest channel angle
+        auto it = std::lower_bound(channelAngles.begin(), channelAngles.end(), verticalAngle, std::greater<>());
+        if (it == channelAngles.end()) continue;  // 각도가 모든 채널의 범위를 벗어난 경우
+
+        size_t rowIdn = std::distance(channelAngles.begin(), it);
+
+        float horizonAngle = atan2(inPoint.x, inPoint.y) * 180 / M_PI;
+        size_t columnIdn = static_cast<size_t>((horizonAngle + 180.0) / 360.0 * H_SCAN);
+
+        if (columnIdn >= H_SCAN) {
+            columnIdn -= H_SCAN;
         }
 
-        if (rowIdn < 0 || rowIdn >= V_SCAN)
-            continue;
-
-        horizonAngle = atan2(inPoint.x, inPoint.y) * 180 / M_PI;
-        columnIdn = -round((horizonAngle - 90.0) / ang_res_x) + H_SCAN / 2;
-
-        if (columnIdn >= H_SCAN)
-            columnIdn -= H_SCAN;
-
-        if (columnIdn < 0 || columnIdn >= H_SCAN)
-            continue;
-
-        index = columnIdn + rowIdn * H_SCAN;
-
-        cloudOut->points[index] = inPoint;
+        size_t index = columnIdn + rowIdn * H_SCAN;
+        if (index < cloudOut.points.size()) {
+            cloudOut.points[index] = inPoint;
+        }
     }
-    
+
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
 }
 
-void convertPointCloudToImage(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, cv::Mat &imageOut, double &time_taken)
-{   
+template<typename PointT> inline
+void CloudProcessor<PointT>::convertPointCloudToImage(const pcl::PointCloud<PointT>& cloudIn, cv::Mat& imageOut, double& time_taken) 
+{
     auto start = std::chrono::steady_clock::now();
 
-    if (cloudIn->points.empty()) {
-        std::cerr << "Input cloud is empty! <- projectPointCloud" << std::endl;
+    if (cloudIn.points.empty()) {
+        std::cerr << "Input cloud is empty! <- convertPointCloudToImage" << std::endl;
         return;
     }
+
     cv::Mat temp_image = cv::Mat::zeros(V_SCAN, H_SCAN, CV_8UC1);
 
-    for (int i = 0; i < V_SCAN; ++i)
-    {
-        int reversed_i = V_SCAN - 1 - i;  // 수직 인덱스를 반대로 계산하여 상하 반전
-        for (int j = 0; j < H_SCAN; ++j)
-        {
-            int reversed_j = H_SCAN - 1 - j;  // 수평 인덱스를 반대로 계산하여 좌우 반전
+    for (int i = 0; i < V_SCAN; ++i) {
+        for (int j = 0; j < H_SCAN; ++j) {
             int index = i * H_SCAN + j;
-            if (!std::isnan(cloudIn->points[index].intensity))
-            {
-                temp_image.at<uchar>(reversed_i, reversed_j) = static_cast<uchar>(cloudIn->points[index].intensity);
+            if (index < cloudIn.points.size() && !std::isnan(cloudIn.points[index].intensity)) {
+                temp_image.at<uchar>(i, j) = static_cast<uchar>(cloudIn.points[index].intensity);
             }
         }
     }
@@ -503,85 +225,37 @@ void convertPointCloudToImage(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, c
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
-
 }
 
-// ouster
-void projectPointCloud(const pcl::PointCloud<ouster_ros::Point>::Ptr &cloudIn, 
-                        pcl::PointCloud<ouster_ros::Point>::Ptr &cloudOut, double &time_taken)
+template<typename PointT> inline
+void CloudProcessor<PointT>::cropPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double& time_taken) 
 {
     auto start = std::chrono::steady_clock::now();
 
-    cloudOut -> clear();
-    cloudOut->points.resize(V_SCAN * H_SCAN);
-
-    float verticalAngle, horizonAngle;
-    size_t rowIdn, columnIdn, index;
-    ouster_ros::Point outPoint;
-
-    for (const auto& inPoint : cloudIn->points)
-    {   
-        outPoint = inPoint;
-
-        verticalAngle = atan2(outPoint.z, sqrt(outPoint.x * outPoint.x + outPoint.y * outPoint.y)) * 180 / M_PI;
-
-        rowIdn = (verticalAngle + ang_bottom) / ang_res_y;
-
-        if (rowIdn < 0 || rowIdn >= V_SCAN)
-            continue;
-
-        horizonAngle = atan2(outPoint.x, outPoint.y) * 180 / M_PI;
-        columnIdn = -round((horizonAngle - 90.0) / ang_res_x) + H_SCAN / 2;
-
-        if (columnIdn >= H_SCAN)
-            columnIdn -= H_SCAN;
-
-        if (columnIdn < 0 || columnIdn >= H_SCAN)
-            continue;
-
-        index = columnIdn + rowIdn * H_SCAN;
-        cloudOut->points[index] = outPoint;
-
-    }
-
-    auto end = std::chrono::steady_clock::now();
-    std::chrono::duration<double> elapsed_seconds = end - start;
-    time_taken = elapsed_seconds.count();
-}
-
-void cropPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn, 
-                    pcl::PointCloud<PointType>::Ptr &cloudOut, double &time_taken)
-{   
-    auto start = std::chrono::steady_clock::now();
-
-    if (cloudIn->points.empty()) {
+    if (cloudIn.points.empty()) {
         std::cerr << "Input cloud is empty! <- cropPointCloud" << std::endl;
         return;
     }
     
-    cloudOut->clear();
-    cloudOut->reserve(cloudIn->size());
-
-    for (const auto& inPoint : cloudIn->points)
-    {
-        const PointType& point = inPoint;
+    cloudOut.clear();
+    cloudOut.reserve(cloudIn.size());
+    
+    for (const auto& point : cloudIn.points) {
 
         // ring filtering
-        if (crop_ring == true && point.ring % ring == 0) { continue; }
+        // if (crop_ring_enabled && point.ring % crop_ring == 0) { continue; }
         // intensity filtering
-        if (crop_intensity == true && point.intensity < intensity) { continue; }
+        // if (crop_intensity_enabled && point.intensity < crop_intensity) { continue; }
         
         // Car exclusion
-        if (point.x >= min_x && point.x <= max_x &&
-            point.y >= min_y && point.y <= max_y) { continue; }
+        if (point.x >= -2.0 && point.x <= 2.0 &&
+            point.y >= -0.8 && point.y <= 0.8) { continue; }
 
         // Rectangle
-        if (point.x >= MIN_X && point.x <= MAX_X &&
-            point.y >= MIN_Y && point.y <= MAX_Y &&
-            //point.z <= MAX_Z)
-            point.z >= MIN_Z && point.z <= MAX_Z)
-        {
-            cloudOut->push_back(point);
+        if (point.x >= roi_min_x && point.x <= roi_max_x &&
+            point.y >= roi_min_y && point.y <= roi_max_y &&
+            point.z >= roi_min_z && point.z <= roi_max_z) {
+            cloudOut.push_back(point);
         }
 
         // Degree
@@ -590,50 +264,49 @@ void cropPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn,
         // double angle = std::atan2(point.y, point.x);
         // if (angle >= min_angle_rad && angle <= max_angle_rad)
         // {
-        //     cloudOut->push_back(point);
+        //     cloudOut.push_back(point);
         // }
 
         // Circle
-        /*
-        float distance = std::sqrt(point.x * point.x + point.y * point.y);
-        if (distance < R)
-        {
-            cloudOut->push_back(point);
-        }
-        */
+        // float distance = std::sqrt(point.x * point.x + point.y * point.y);
+        // if (distance < R)
+        // {
+        //     cloudOut.push_back(point);
+        // }
     }
 
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
 }
-
-template<typename PointT>
-void cropPointCloudHDMap(const typename pcl::PointCloud<PointT>::Ptr &cloudIn, typename pcl::PointCloud<PointT>::Ptr &cloudOut, 
-                    const ros::Time &input_stamp, tf2_ros::Buffer &tf_buffer, const std::string target_frame, 
-                    const std::string world_frame, const std::vector<std::pair<float, float>> &global_path, double &time_taken)
+/*
+template<typename PointT> inline
+void CloudProcessor<PointT>::cropPointCloudHDMap(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, 
+                    tf2_ros::Buffer &tf_buffer, const std::string target_frame, const std::string world_frame, 
+                    const std::vector<std::pair<float, float>> &global_path, double &time_taken)
 {
     auto start = std::chrono::steady_clock::now();
 
-    if (cloudIn->points.empty()) {
+    if (cloudIn.points.empty()) {
         std::cerr << "Input cloud is empty! <- cropPointCloudHDMap" << std::endl;
         return;
     }
 
-    cloudOut->clear();
-    cloudOut->reserve(cloudIn->size());
+    cloudOut.clear();
+    cloudOut.reserve(cloudIn.size());
 
     pcl::KdTreeFLANN<PointT> kdtree;
 
-    kdtree.setInputCloud(cloudIn);
+    //kdtree.setInputCloud(cloudIn);
+    kdtree.setInputCloud(boost::make_shared<const pcl::PointCloud<PointT>>(cloudIn));
 
     geometry_msgs::TransformStamped transformStamped;
     try {
-        transformStamped = tf_buffer.lookupTransform(world_frame, target_frame, ros::Time(0)); // input_stamp
+        transformStamped = tf_buffer.lookupTransform(world_frame, target_frame, ros::Time(0)); // cur_stamp
     } catch (tf2::TransformException &ex) {
         // ROS_WARN("%s", ex.what());
         cloudOut = cloudIn;
-        return;  // Handle the exception or exit
+        return;
     }
 
     double ego_x = transformStamped.transform.translation.x;
@@ -649,7 +322,6 @@ void cropPointCloudHDMap(const typename pcl::PointCloud<PointT>::Ptr &cloudIn, t
 
     double min_dis = 1000;
     int min_idx = 0;
-    // int step_size = 4000;
 
     int path_len = global_path.size();
     
@@ -658,15 +330,12 @@ void cropPointCloudHDMap(const typename pcl::PointCloud<PointT>::Ptr &cloudIn, t
         if (min_dis > dis) { min_dis = dis; min_idx = i; }
     }
 
-
     int curr_index = min_idx;
-    
     double relative_node_x, relative_node_y;
     
     std::vector<int> indices;
-    for (int k = 0; k < 150; ++k) {
-
-        indices.push_back((curr_index + k) % path_len);
+    for (int k = 0; k < 180; ++k) {
+        indices.push_back((curr_index + path_len + k - 80) % path_len);
     }
     
     for (int idx : indices){
@@ -681,12 +350,10 @@ void cropPointCloudHDMap(const typename pcl::PointCloud<PointT>::Ptr &cloudIn, t
             relative_node_x = cos_heading * dx + sin_heading * dy;
             relative_node_y = -sin_heading * dx + cos_heading * dy;
 
-
             PointT query;
             query.x = static_cast<float>(relative_node_x);
             query.y = static_cast<float>(relative_node_y);
             query.z = 0.0f;
-            // query.intensity = 0.0f;
 
             std::vector<int> idxes;
             std::vector<float> sqr_dists;
@@ -694,27 +361,99 @@ void cropPointCloudHDMap(const typename pcl::PointCloud<PointT>::Ptr &cloudIn, t
             idxes.clear();
             sqr_dists.clear();
             
-            kdtree.radiusSearch(query, radius, idxes, sqr_dists);
-            
+            kdtree.radiusSearch(query, crop_hd_map_radius, idxes, sqr_dists);
             
             for (const auto& idx : idxes) {
-                cloudOut->points.push_back(cloudIn->points[idx]);
+                cloudOut.points.push_back(cloudIn.points[idx]);
             }
         }
     }
-    
+
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end - start;
+    time_taken = elapsed_seconds.count();
+}
+*/
+template<typename PointT> inline
+void CloudProcessor<PointT>::cropPointCloudHDMap(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, 
+                    tf2_ros::Buffer &tf_buffer, const std::string target_frame, const std::string world_frame, 
+                    const std::vector<std::pair<float, float>> &global_path, double &time_taken)
+{
+    auto start = std::chrono::steady_clock::now();
+
+    if (cloudIn.points.empty()) {
+        std::cerr << "Input cloud is empty! <- cropPointCloudHDMap" << std::endl;
+        return;
+    }
+
+    cloudOut.clear();
+    cloudOut.reserve(cloudIn.size());
+
+    geometry_msgs::TransformStamped transformStamped;
+    try {
+        transformStamped = tf_buffer.lookupTransform(world_frame, target_frame, ros::Time(0)); // input_stamp
+    } catch (tf2::TransformException &ex) {
+        // ROS_WARN("%s", ex.what());
+        cloudOut = cloudIn;
+        return;  
+    }
+
+    double ego_x = transformStamped.transform.translation.x;
+    double ego_y = transformStamped.transform.translation.y;
+
+    double min_dis = std::numeric_limits<double>::max();
+    int min_idx = 0;
+    int path_len = global_path.size();
+
+    // Find the closest point on the global path to the ego vehicle's position
+    for (int i = 0; i < path_len; ++i) {
+        double dis = std::hypot(global_path[i].first - ego_x, global_path[i].second - ego_y);
+        if (min_dis > dis) {
+            min_dis = dis;
+            min_idx = i;
+        }
+    }
+
+    // Define the range of indices around the closest point
+    int curr_index = min_idx;
+    std::vector<int> indices;
+    for (int k = 0; k < 180; ++k) {
+        indices.push_back((curr_index + path_len + k - 80) % path_len);
+    }
+
+    // Transform and filter points based on proximity to the selected global path range
+    #pragma omp parallel for
+    for (const auto& point : cloudIn.points) {
+        geometry_msgs::Point geo_point;
+        geo_point.x = point.x;
+        geo_point.y = point.y;
+        geo_point.z = point.z;
+
+        geometry_msgs::Point transformed_point;
+        tf2::doTransform(geo_point, transformed_point, transformStamped);
+
+        for (int idx : indices) {
+            double distance = std::hypot(global_path[idx].first - transformed_point.x, global_path[idx].second - transformed_point.y);
+            if (distance <= crop_hd_map_radius) {
+                #pragma omp critical
+                cloudOut.points.push_back(point);
+                break;
+            }
+        }
+    }
 
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
 }
 
-void undistortPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, const Eigen::Quaterniond &rotation,
-                        pcl::PointCloud<PointXYZIT>::Ptr &cloudOut, double &time_taken)
+template<typename PointT> inline
+void CloudProcessor<PointT>::undistortPointCloud(const pcl::PointCloud<PointT>& cloudIn, 
+                                                 pcl::PointCloud<PointT>& cloudOut, double &time_taken) 
 {
     auto start_time = std::chrono::steady_clock::now();
 
-    if (cloudIn->points.empty()) {
+    if (cloudIn.points.empty()) {
         std::cerr << "Input cloud is empty! <- undistortPointCloud" << std::endl;
         return;
     }
@@ -724,25 +463,28 @@ void undistortPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, const 
     Sophus::SO3d inverse_so3 = final_so3.inverse();
 
     // Process each point in the cloud
-    cloudOut->clear();
-    cloudOut->points.resize(cloudIn->points.size());
-    // cloudOut->width = cloudIn->width;
-    // cloudOut->height = cloudIn->height;
-    // cloudOut->is_dense = cloudIn->is_dense;
+    cloudOut.clear();
+    cloudOut.reserve(cloudIn.size());
 
-    for (size_t i = 0; i < cloudIn->points.size(); ++i) {
-        const auto &pt = cloudIn->points[i];
-        
+    for (size_t i = 0; i < cloudIn.points.size(); ++i) {
+        const auto &pt = cloudIn.points[i];
+
+        double dt = pt.timestamp - cur_stamp.toSec();
+        if (dt == 0) continue;
+        double ratio = dt / interval;
+        Sophus::SO3d scaled_so3 = Sophus::SO3d::exp(ratio * inverse_so3.log());
+
         // Apply the inverse rotation
         Eigen::Vector3d pt_vec(pt.x, pt.y, pt.z);
-        Eigen::Vector3d rotated_pt = inverse_so3 * pt_vec;
+        Eigen::Vector3d rotated_pt = scaled_so3 * pt_vec;
 
-        PointXYZIT new_point;
+        PointT new_point;
         new_point = pt;
         new_point.x = rotated_pt.x();
         new_point.y = rotated_pt.y();
         new_point.z = rotated_pt.z();
-        cloudOut->points[i] = new_point;
+        //cloudOut.points[i] = new_point;
+        cloudOut.points.push_back(new_point);
     }
 
     auto end_time = std::chrono::steady_clock::now();
@@ -750,112 +492,56 @@ void undistortPointCloud(const pcl::PointCloud<PointXYZIT>::Ptr &cloudIn, const 
     time_taken = elapsed_seconds.count();
 }
 
-void downsamplingPointCloud(const pcl::PointCloud<PointType>::Ptr &cloudIn, 
-                            pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudOut, double &time_taken)
+template<typename PointT> inline
+void CloudProcessor<PointT>::downsamplingPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<pcl::PointXYZ>& cloudOut, double& time_taken) 
 {
     auto start = std::chrono::steady_clock::now();
 
-    if (cloudIn->points.empty()) {
+    if (cloudIn.points.empty()) {
         std::cerr << "Input cloud is empty! <- downsamplingPointCloud" << std::endl;
         return;
     }
 
-    cloudOut->clear();
-    // cloudOut->reserve(cloudIn->size());
+    cloudOut.clear();
+    cloudOut.reserve(cloudIn.size());
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr tempCloud(new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::copyPointCloud(*cloudIn, *tempCloud);
+    pcl::PointCloud<pcl::PointXYZ> tempCloud;
+    pcl::copyPointCloud(cloudIn, tempCloud); // copyPointCloud 사용하여 타입 변환 및 데이터 복사
     pcl::VoxelGrid<pcl::PointXYZ> voxel_grid_filter;
-    voxel_grid_filter.setInputCloud(tempCloud);
-    voxel_grid_filter.setLeafSize(leaf_size_x, leaf_size_y, leaf_size_z);
-    voxel_grid_filter.filter(*cloudOut);
+    voxel_grid_filter.setInputCloud(boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>(tempCloud)); // 입력 클라우드 설정
+    voxel_grid_filter.setLeafSize(leaf_size_x, leaf_size_y, leaf_size_z); // Voxel 크기 설정
+    voxel_grid_filter.filter(cloudOut); // 필터링 수행
     
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
 }
 
-void EuclideanClustering(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudIn, 
-                            vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &outputClusters, double &time_taken)
-{
-    auto start = std::chrono::steady_clock::now();
 
-    if (cloudIn->points.empty()) {
-        std::cerr << "Input cloud is empty! <- EuclideanClustering" << std::endl;
-        return;
-    }
-
-    outputClusters.clear();
-
-    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
-
-    // mingu
-    tree->setInputCloud(cloudIn);
-
-    std::vector<pcl::PointIndices> clusterIndices;
-    pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-    ec.setClusterTolerance(clusterTolerance);
-    ec.setMinClusterSize(minSize);
-    ec.setMaxClusterSize(maxSize);
-    ec.setSearchMethod(tree);
-    // mingu
-    ec.setInputCloud(cloudIn);
-
-    ec.extract(clusterIndices);
-
-    for(pcl::PointIndices getIndices: clusterIndices)
-    {
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloudCluster (new pcl::PointCloud<pcl::PointXYZ>);
-        for (int index : getIndices.indices)
-            // mingu
-            cloudCluster->points.push_back (cloudIn->points[index]);
-
-        cloudCluster->width = cloudCluster->points.size();
-        cloudCluster->height = 1;
-        cloudCluster->is_dense = true;
-
-        // size filtering
-        pcl::PointXYZ minPt, maxPt;
-        pcl::getMinMax3D(*cloudCluster, minPt, maxPt);
-        double clusterSizeX = maxPt.x - minPt.x;
-        double clusterSizeY = maxPt.y - minPt.y;
-        double clusterSizeZ = maxPt.z - minPt.z;
-
-        if (clusterSizeX > minClusterSizeX && clusterSizeX < maxClusterSizeX
-        && clusterSizeY > minClusterSizeY && clusterSizeY < maxClusterSizeY
-        && clusterSizeZ > minClusterSizeZ && clusterSizeZ < maxClusterSizeZ) 
-        {           
-            outputClusters.push_back(cloudCluster);
-        }
-    }
-
-    auto end = std::chrono::steady_clock::now();
-    std::chrono::duration<double> elapsed_seconds = end - start;
-    time_taken = elapsed_seconds.count();
-}
-
-// 개발 중,,
-void adaptiveClustering(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudIn, 
-                        std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &outputClusters, double &time_taken)
+template<typename PointT> inline
+void CloudProcessor<PointT>::adaptiveClustering(const pcl::PointCloud<pcl::PointXYZ>& cloudIn, 
+                                                std::vector<pcl::PointCloud<pcl::PointXYZ>>& outputClusters, double& time_taken) 
 {
     auto start = std::chrono::high_resolution_clock::now();
 
-    if (cloudIn->points.empty()) {
+    if (cloudIn.points.empty()) {
         std::cerr << "Input cloud is empty! <- adaptiveClustering" << std::endl;
         return;
     }
 
     outputClusters.clear();
+    outputClusters.reserve(cloudIn.size());
 
     // Divide the point cloud into nested circular regions
     std::vector<float> regions(max_region, max_region / number_region); // Example: Fill regions with a distance increment of 15m each
-    boost::array<std::vector<int>, max_region> indices_array;
+    std::vector<std::vector<int>> indices_array(max_region);
 
-    for (int i = 0; i < cloudIn->size(); i++) {
-        float distance = cloudIn->points[i].x * cloudIn->points[i].x + cloudIn->points[i].y * cloudIn->points[i].y;
+    for (int i = 0; i < cloudIn.size(); i++) {
+        float distance = cloudIn.points[i].x * cloudIn.points[i].x + cloudIn.points[i].y * cloudIn.points[i].y;
         float range = 0.0;
         for (int j = 0; j < max_region; j++) {
-            if (distance > range * range && distance <= (range + regions[j]) * (range + regions[j])) {
+            if (distance > range * range && distance <= (range + regions[j]) * (range + regions[j]))
+            {
                 indices_array[j].push_back(i);
                 break;
             }
@@ -864,46 +550,45 @@ void adaptiveClustering(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudIn,
     }
 
     // Euclidean clustering for each region
-    float tolerance = 0.3; // Start tolerance
     for (int i = 0; i < max_region; i++) {
         if (indices_array[i].empty()) continue;
 
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloudSegment(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ> cloudSegment;
         for (int index : indices_array[i]) {
-            cloudSegment->points.push_back(cloudIn->points[index]);
+            cloudSegment.points.push_back(cloudIn.points[index]);
         }
 
-        pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
-        tree->setInputCloud(cloudSegment);
+        pcl::search::KdTree<pcl::PointXYZ> tree;
+        tree.setInputCloud(boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>(cloudSegment));
 
         std::vector<pcl::PointIndices> cluster_indices;
         pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-        ec.setClusterTolerance(tolerance + delta_tolerance * i); // Increment tolerance for farther regions
-        ec.setMinClusterSize(minSize);
-        ec.setMaxClusterSize(maxSize);
-        ec.setSearchMethod(tree);
-        ec.setInputCloud(cloudSegment);
+        ec.setClusterTolerance(start_tolerance + delta_tolerance * i); // Increment tolerance for farther regions
+        ec.setMinClusterSize(adaptive_min_size);
+        ec.setMaxClusterSize(adaptive_max_size);
+        ec.setSearchMethod(boost::make_shared<pcl::search::KdTree<pcl::PointXYZ>>(tree));
+        ec.setInputCloud(boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>(cloudSegment));
         ec.extract(cluster_indices);
 
         for (auto& indices : cluster_indices) {
-            pcl::PointCloud<pcl::PointXYZ>::Ptr cluster(new pcl::PointCloud<pcl::PointXYZ>);
+            pcl::PointCloud<pcl::PointXYZ> cluster;
             for (int idx : indices.indices) {
-                cluster->points.push_back(cloudSegment->points[idx]);
+                cluster.points.push_back(cloudSegment.points[idx]);
             }
-            cluster->width = cluster->size();
-            cluster->height = 1;
-            cluster->is_dense = true;
+            cluster.width = cluster.size();
+            cluster.height = 1;
+            cluster.is_dense = true;
             
-            // // Size filterin
+            // Size filtering
             pcl::PointXYZ minPt, maxPt;
-            pcl::getMinMax3D(*cluster, minPt, maxPt);
+            pcl::getMinMax3D(cluster, minPt, maxPt);
             double clusterSizeX = maxPt.x - minPt.x;
             double clusterSizeY = maxPt.y - minPt.y;
             double clusterSizeZ = maxPt.z - minPt.z;
 
-            if (clusterSizeX > minClusterSizeX && clusterSizeX < maxClusterSizeX &&
-                clusterSizeY > minClusterSizeY && clusterSizeY < maxClusterSizeY &&
-                clusterSizeZ > minClusterSizeZ && clusterSizeZ < maxClusterSizeZ) {
+            if (clusterSizeX > filter_min_size_x && clusterSizeX < filter_max_size_x &&
+                clusterSizeY > filter_min_size_y && clusterSizeY < filter_max_size_y &&
+                clusterSizeZ > filter_min_size_z && clusterSizeZ < filter_max_size_z) {
                 outputClusters.push_back(cluster);
             }
         }
@@ -914,52 +599,109 @@ void adaptiveClustering(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudIn,
     time_taken = elapsed.count();
 }
 
-void depthClustering(const pcl::PointCloud<PointType>::Ptr &cloudIn, 
-                    std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &outputClusters, double &time_taken)
-{
-    auto start = std::chrono::steady_clock::now();
 
-    if (cloudIn->points.empty()) {
-        std::cerr << "Input cloud is empty!" << std::endl;
+template<typename PointT> inline
+void CloudProcessor<PointT>::voxelClustering(const pcl::PointCloud<PointT>& cloudIn, 
+                                             std::vector<pcl::PointCloud<pcl::PointXYZ>>& outputClusters, double& time_taken) 
+{
+    auto start = std::chrono::high_resolution_clock::now();
+
+    if (cloudIn.points.empty()) {
+        std::cerr << "Input cloud is empty! <- voxelClustering" << std::endl;
         return;
     }
 
-    DepthCluster depthCluster(vertical_resolution, horizontal_resolution, lidar_lines, cluster_size);
-
-    // 입력 포인트 클라우드 설정
-    pcl::PointCloud<pcl::PointXYZI>::Ptr cloudInXYZI(new pcl::PointCloud<pcl::PointXYZI>);
-    copyPointCloud(*cloudIn, *cloudInXYZI); // PointType에서 XYZI로 변환
-    depthCluster.setInputCloud(cloudInXYZI);
-
-    // 클러스터 추출 실행
-    auto clusters_indices = depthCluster.getClustersIndex();
-
-    // 결과 클러스터 추출
     outputClusters.clear();
-    for (const auto& indices : clusters_indices) {
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloudCluster(new pcl::PointCloud<pcl::PointXYZ>);
-        for (int index : indices) {
-            // cloudCluster->points.push_back(cloudIn->points[index]);
-            pcl::PointXYZ point;
-            point.x = cloudIn->points[index].x;
-            point.y = cloudIn->points[index].y;
-            point.z = cloudIn->points[index].z;
-            cloudCluster->points.push_back(point);
+    outputClusters.reserve(cloudIn.size());
+
+    // Convert the input cloud to pcl::PointXYZ type
+    pcl::PointCloud<pcl::PointXYZ> xyzCloud;
+    pcl::copyPointCloud(cloudIn, xyzCloud);
+
+    // Divide the point cloud into nested circular regions
+    std::vector<float> regions(max_region, max_region / number_region); // Example: Fill regions with a distance increment of 15m each
+    std::vector<std::vector<int>> indices_array(max_region);
+
+    for (int i = 0; i < xyzCloud.size(); i++) {
+        //float distance = xyzCloud.points[i].x * xyzCloud.points[i].x + xyzCloud.points[i].y * xyzCloud.points[i].y;
+        float distance = std::sqrt(xyzCloud.points[i].x * xyzCloud.points[i].x + xyzCloud.points[i].y * xyzCloud.points[i].y);
+        float range = 0.0;
+        for (int j = 0; j < max_region; j++) {
+            //if (distance > range * range && distance <= (range + regions[j]) * (range + regions[j])) {
+            if (distance > range && distance <= (range + regions[j])) {
+                indices_array[j].push_back(i);
+                break;
+            }
+            range += regions[j];
         }
-        cloudCluster->width = cloudCluster->points.size();
-        cloudCluster->height = 1;
-        cloudCluster->is_dense = true;
-        outputClusters.push_back(cloudCluster);
     }
 
-    auto end = std::chrono::steady_clock::now();
-    std::chrono::duration<double> elapsed_seconds = end - start;
-    time_taken = elapsed_seconds.count();
+    // Apply voxel grid filter and perform Euclidean clustering for each region
+    for (int i = 0; i < max_region; i++) {
+        if (indices_array[i].empty()) continue;
+
+        pcl::PointCloud<pcl::PointXYZ> cloudSegment;
+        for (int index : indices_array[i]) {
+            cloudSegment.points.push_back(xyzCloud.points[index]);
+        }
+
+        // Define voxel grid filter
+        pcl::VoxelGrid<pcl::PointXYZ> voxel_grid_filter;
+        float leaf_size = (start_tolerance/2) / (1 + i * delta_tolerance);
+        voxel_grid_filter.setLeafSize(leaf_size, leaf_size, leaf_size);
+        voxel_grid_filter.setInputCloud(boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>(cloudSegment));
+
+        pcl::PointCloud<pcl::PointXYZ> downsampledCloud;
+        voxel_grid_filter.filter(downsampledCloud);
+
+        // Perform Euclidean clustering
+        pcl::search::KdTree<pcl::PointXYZ> tree;
+        tree.setInputCloud(boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>(downsampledCloud));
+
+        std::vector<pcl::PointIndices> cluster_indices;
+        pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+        ec.setClusterTolerance(start_tolerance + delta_tolerance * i); // Increment tolerance for farther regions
+        ec.setMinClusterSize(adaptive_min_size);
+        ec.setMaxClusterSize(adaptive_max_size);
+        ec.setSearchMethod(boost::make_shared<pcl::search::KdTree<pcl::PointXYZ>>(tree));
+        ec.setInputCloud(boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>(downsampledCloud));
+        ec.extract(cluster_indices);
+
+        for (auto& indices : cluster_indices) {
+            pcl::PointCloud<pcl::PointXYZ> cluster;
+            for (int idx : indices.indices) {
+                cluster.points.push_back(downsampledCloud.points[idx]);
+            }
+            cluster.width = cluster.size();
+            cluster.height = 1;
+            cluster.is_dense = true;
+
+            // Size filtering
+            pcl::PointXYZ minPt, maxPt;
+            pcl::getMinMax3D(cluster, minPt, maxPt);
+            double clusterSizeX = maxPt.x - minPt.x;
+            double clusterSizeY = maxPt.y - minPt.y;
+            double clusterSizeZ = maxPt.z - minPt.z;
+
+            if (clusterSizeX > filter_min_size_x && clusterSizeX < filter_max_size_x &&
+                clusterSizeY > filter_min_size_y && clusterSizeY < filter_max_size_y &&
+                clusterSizeZ > filter_min_size_z && clusterSizeZ < filter_max_size_z) {
+                outputClusters.push_back(cluster);
+            }
+        }
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
+    time_taken = elapsed.count();
 }
 
 
-void fittingLShape(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &inputClusters, const ros::Time &input_stamp, 
-                jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken)
+
+
+template<typename PointT> inline
+void CloudProcessor<PointT>::fittingLShape(const std::vector<pcl::PointCloud<pcl::PointXYZ>>& inputClusters, 
+                                           const std::string lidar_frame, jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken) 
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -970,251 +712,46 @@ void fittingLShape(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &input
 
     output_bbox_array.boxes.clear();
 
-    for (pcl::PointCloud<pcl::PointXYZ>::Ptr cluster : inputClusters)
-    {   
+    for (const pcl::PointCloud<pcl::PointXYZ>& cluster : inputClusters) {
         pcl::PointXYZ minPoint, maxPoint;
-        pcl::getMinMax3D(*cluster, minPoint, maxPoint);
+        pcl::getMinMax3D(cluster, minPoint, maxPoint);
 
         // rectangle
         LShapedFIT lshaped;
-        std::vector<cv::Point2f> points = pcl2Point2f(cluster); // 3d cluster를 BEV로 투영
+        std::vector<cv::Point2f> points = pcl2Point2f(cluster, projection_range); // Convert 3D cluster to BEV projection
         cv::RotatedRect rr = lshaped.FitBox(&points);
         std::vector<cv::Point2f> vertices = lshaped.getRectVertex();
-        double yaw = (rr.angle+90)*M_PI/180.0; // degree2radian
+        double yaw = (rr.angle + 90) * M_PI / 180.0; // Convert degrees to radians
 
-        if (rr.center.x == 0.0) { continue; } // 왜 원점에 이상한 클러스터가 생길까?
+        if (rr.center.x == 0.0) { continue; } // Skip clusters at the origin
 
         // Create jsk_recognition_msgs::BoundingBox
         jsk_recognition_msgs::BoundingBox bbox;
-        //bbox.header.stamp = ros::Time::now();
-        bbox.header.stamp = input_stamp; // mingu
-        bbox.header.frame_id = frameID;
+        bbox.header.stamp = cur_stamp;
+        bbox.header.frame_id = lidar_frame;
         bbox.pose.position.x = rr.center.x;
         bbox.pose.position.y = rr.center.y;
-        bbox.pose.position.z = (minPoint.z + maxPoint.z) / 2.0; // Set z-axis height to be halfway between 0 and 1
+        bbox.pose.position.z = (minPoint.z + maxPoint.z) / 2.0; // Set z-axis height to be halfway between min and max
         bbox.dimensions.x = rr.size.height;
         bbox.dimensions.y = rr.size.width;
         bbox.dimensions.z = maxPoint.z - minPoint.z;
         bbox.pose.orientation.z = std::sin(yaw / 2.0);
         bbox.pose.orientation.w = std::cos(yaw / 2.0);
-        
+
         output_bbox_array.boxes.push_back(bbox);
     }
 
-    for (int i = 0; i < output_bbox_array.boxes.size(); i++)
-    {
-        for (int j = 0; j < output_bbox_array.boxes.size(); j++)
-        {
+    for (int i = 0; i < output_bbox_array.boxes.size(); i++) {
+        for (int j = 0; j < output_bbox_array.boxes.size(); j++) {
             double overlap = getBBoxOverlap(output_bbox_array.boxes[j], output_bbox_array.boxes[i]);
-            if(i != j && overlap > threshIOU){
+            if (i != j && overlap > threshIOU) {
                 output_bbox_array.boxes.erase(output_bbox_array.boxes.begin() + j);
             }
         }
     }
-    auto end = std::chrono::steady_clock::now();
-    std::chrono::duration<double> elapsed_seconds = end - start;
-    time_taken = elapsed_seconds.count();
-}
-
-// L-shape Fitting 과 비교용
-#include <pcl/common/pca.h>
-void fittingPCA(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &inputClusters, const ros::Time &input_stamp, 
-                jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken)
-{
-    auto start = std::chrono::steady_clock::now();
-
-    output_bbox_array.boxes.clear();
-
-    for (auto cluster : inputClusters)
-    {
-        pcl::PCA<pcl::PointXYZ> pca;
-        pcl::PointXYZ minPoint, maxPoint;
-        pcl::getMinMax3D(*cluster, minPoint, maxPoint);
-
-        // Find the oriented bounding box
-        // pca.setInputCloud(cluster);
-        // Eigen::Vector3f eigen_values = pca.getEigenValues();
-        // Eigen::Matrix3f eigen_vectors = pca.getEigenVectors();
-
-        // Create jsk_recognition_msgs::BoundingBox
-        jsk_recognition_msgs::BoundingBox bbox;
-        bbox.header.stamp = input_stamp;
-        bbox.header.frame_id = frameID;
-        bbox.pose.position.x = (minPoint.x + maxPoint.x) / 2.0;
-        bbox.pose.position.y = (minPoint.y + maxPoint.y) / 2.0;
-        bbox.pose.position.z = (minPoint.z + maxPoint.z) / 2.0;
-        bbox.dimensions.x = maxPoint.x - minPoint.x;
-        bbox.dimensions.y = maxPoint.y - minPoint.y;
-        bbox.dimensions.z = maxPoint.z - minPoint.z;
-        // Eigen::Quaternionf quat(eigen_vectors);
-        // bbox.pose.orientation.x = quat.x();
-        // bbox.pose.orientation.y = quat.y();
-        // bbox.pose.orientation.z = quat.z();
-        // bbox.pose.orientation.w = quat.w();
-        bbox.pose.orientation.x = 0;
-        bbox.pose.orientation.y = 0;
-        bbox.pose.orientation.z = 0;
-        bbox.pose.orientation.w = 1;
-
-        output_bbox_array.boxes.push_back(bbox);
-    }
 
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
 }
-
-void integrationBbox(const jsk_recognition_msgs::BoundingBoxArray &cluster_bbox_array, 
-                    const jsk_recognition_msgs::BoundingBoxArray &deep_bbox_array, 
-                    jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken)
-{
-    auto start = std::chrono::steady_clock::now();
-
-    output_bbox_array.boxes.clear();
-    // Iterate through each bbox in cluster_bbox_array
-    for (const auto &cluster_bbox : cluster_bbox_array.boxes)
-    {
-        bool keep_cluster_bbox = true;
-        // Check IOU with bbox in deep_bbox_array within distance_threshold
-        for (const auto &deep_bbox : deep_bbox_array.boxes)
-        {
-            double overlap = getBBoxOverlap(cluster_bbox, deep_bbox);
-            // If IOU exceeds threshold, prioritize deep_bbox
-            if (overlap > threshIOU)
-            {
-                keep_cluster_bbox = false;
-                break;
-            }
-        }
-        if (keep_cluster_bbox)
-        {
-            output_bbox_array.boxes.push_back(cluster_bbox);
-        }
-    }
-    // Add remaining deep_bbox_array to output_bbox_array
-    output_bbox_array.boxes.insert(output_bbox_array.boxes.end(), deep_bbox_array.boxes.begin(), deep_bbox_array.boxes.end());
-
-    auto end = std::chrono::steady_clock::now();
-    std::chrono::duration<double> elapsed_seconds = end - start;
-    time_taken = elapsed_seconds.count();
-}
-
-void tracking(Track &tracker, const jsk_recognition_msgs::BoundingBoxArray &bbox_array, 
-                jsk_recognition_msgs::BoundingBoxArray &track_bbox_array, visualization_msgs::MarkerArray &track_text_array,
-                const ros::Time &stamp, double &time_taken)
-{
-    auto start = std::chrono::steady_clock::now();
-
-    track_bbox_array.boxes.clear();
-    track_text_array.markers.clear();
-    // jsk_recognition_msgs::BoundingBoxArray filtered_bbox_array = tracker.filtering(cluster_bbox_array);
-    tracker.predictNewLocationOfTracks();
-    tracker.assignDetectionsTracks(bbox_array);
-    tracker.assignedTracksUpdate(bbox_array, stamp);
-    tracker.unassignedTracksUpdate();
-    tracker.deleteLostTracks();
-    tracker.createNewTracks(bbox_array);
-    pair<jsk_recognition_msgs::BoundingBoxArray, visualization_msgs::MarkerArray> bbox = tracker.displayTrack();
-    track_bbox_array = bbox.first;
-    track_text_array = bbox.second;
-
-    auto end = std::chrono::steady_clock::now();
-    std::chrono::duration<double> elapsed_seconds = end - start;
-    time_taken = elapsed_seconds.count();
-}
-
-void transformBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, const std::string &frame_id, 
-                    const std::string &target_frame, tf2_ros::Buffer &tf_buffer,
-                   jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken)
-{
-    auto start = std::chrono::high_resolution_clock::now();
-
-    output_bbox_array.boxes.clear();
-
-    // 변환 정보 조회
-    geometry_msgs::TransformStamped transformStamped;
-    try {
-        transformStamped = tf_buffer.lookupTransform(target_frame, frame_id, ros::Time(0)); // static tf
-    } catch (tf2::TransformException &ex) {
-        //ROS_WARN("TF2 error: %s", ex.what());
-        output_bbox_array = input_bbox_array;
-        return;
-    }
-
-    // 각 bounding box 변환 적용
-    for (const auto &box : input_bbox_array.boxes) {
-        geometry_msgs::PoseStamped input_pose, output_pose;
-
-        input_pose.pose = box.pose;
-        tf2::doTransform(input_pose, output_pose, transformStamped);
-
-        jsk_recognition_msgs::BoundingBox transformed_box;
-        transformed_box.header = box.header;
-        transformed_box.header.frame_id = target_frame;
-        transformed_box.pose = output_pose.pose;
-        transformed_box.dimensions = box.dimensions;
-        transformed_box.value = box.value;
-        transformed_box.label = box.label;
-        output_bbox_array.boxes.push_back(transformed_box);
-    }
-
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed_seconds = end - start;
-    time_taken = elapsed_seconds.count();
-}
-
-void correctionBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, const ros::Time &input_stamp, 
-                    const std::string &target_frame, const std::string &world_frame, tf2_ros::Buffer &tf_buffer,
-                    jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken)
-{
-    auto start = std::chrono::steady_clock::now();
-
-    output_bbox_array.boxes.clear();
-
-    geometry_msgs::TransformStamped transformStampedAtInput, transformStampedAtStamp;
-
-    try {
-        transformStampedAtStamp = tf_buffer.lookupTransform(world_frame, target_frame, input_stamp);
-        //transformStampedAtStamp = tf_buffer.lookupTransform(world_frame, target_frame, input_stamp);
-        transformStampedAtInput = tf_buffer.lookupTransform(world_frame, target_frame, ros::Time(0)); // 변환에 약 0.1초 시간이 좀 걸림
-        
-        //compareTransforms(transformStampedAtInput, transformStampedAtStamp);
-
-    } catch (tf2::TransformException &ex) {
-        // ROS_WARN("%s", ex.what());
-        output_bbox_array = input_bbox_array;
-        return;
-    }
-
-    tf2::Transform tfAtInput, tfAtStamp, deltaTransform;
-    tf2::fromMsg(transformStampedAtInput.transform, tfAtInput);
-    tf2::fromMsg(transformStampedAtStamp.transform, tfAtStamp);
-
-    deltaTransform = tfAtStamp.inverse() * tfAtInput;
-    geometry_msgs::TransformStamped deltaTransformStamped;
-    deltaTransformStamped.transform = tf2::toMsg(deltaTransform);
-
-    // 각 bounding box에 변환 적용
-    for (const auto &box : input_bbox_array.boxes) {
-        geometry_msgs::PoseStamped input_pose, transformed_pose;
-
-        input_pose.pose = box.pose;
-        tf2::doTransform(input_pose, transformed_pose, deltaTransformStamped);
-
-        jsk_recognition_msgs::BoundingBox transformed_box;
-        transformed_box.header = box.header;
-        transformed_box.header.stamp = input_stamp;
-        transformed_box.pose = transformed_pose.pose;
-        transformed_box.dimensions = box.dimensions;
-        transformed_box.value = box.value;
-        transformed_box.label = box.label;
-        output_bbox_array.boxes.push_back(transformed_box);
-
-    }
-
-    auto end = std::chrono::steady_clock::now();
-    std::chrono::duration<double> elapsed_seconds = end - start;
-    time_taken = elapsed_seconds.count();
-}
-
 

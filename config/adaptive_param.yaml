@@ -1,4 +1,52 @@
-min_z_average: -2.5
-max_z_average: -1.5
-min_z_size: 0.3
-max_z_size: 0.7
+lidar_settings:
+  V_SCAN: 128 # Pandar 64 or OT 128
+  H_SCAN: 1800
+  ang_res_x: 0.2 # Calculated as 360.0 / H_SCAN
+  ang_res_y: 0.3125 # Calculated as 40.0 / V_SCAN
+  ang_bottom: 25
+
+downsampling:
+  leaf_size:
+    x: 0.2
+    y: 0.2
+    z: 0.2
+
+clustering:
+  filter:
+    min_size:
+      x: 0.4
+      y: 0.4
+      z: 0.4
+    max_size:
+      x: 6.0
+      y: 6.0
+      z: 3.0
+  adaptive:
+    min_size: 10
+    max_size: 2000
+    start_tolerance: 0.2
+    delta_tolerance: 0.16
+    max_region: 120
+    number_region: 5
+    threshIOU: 0.1
+  L_shape_fitting:
+    projection_range: 0.2
+
+ROI:
+  crop:
+    max:
+      x: 120
+      y: 80.0
+      z: -0.3
+    min:
+      x: -80
+      y: -80.0
+      z: -2.5
+    crop_ring:
+      enabled: false
+      ring: 2
+    crop_intensity:
+      enabled: false
+      intensity: 10
+    crop_hd_map:
+      radius: 5.0

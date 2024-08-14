@@ -19,14 +19,10 @@ void DepthCluster::initParams() {
     image_cols_ = int(360.0/horizontal_resolution_);
     image_rows_ = lidar_lines_;
 
-    if (frameID == "hesai_lidar") {
-        vertical_angle_min_ = -25.0;
-        vertical_angle_max_ = 15.0;
-    }
-    else if (frameID == "os_sensor") {
-        vertical_angle_min_ = -22.5;
-        vertical_angle_max_ = 22.5;
-    }
+
+    vertical_angle_min_ = -25.0;
+    vertical_angle_max_ = 15.0;
+
 }
 
 void DepthCluster::setInputCloud(pcl::PointCloud<pcl::PointXYZI>::Ptr &msg) {

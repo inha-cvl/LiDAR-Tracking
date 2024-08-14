@@ -16,13 +16,8 @@ ImuProcess::ImuProcess() : b_first_frame_(true), last_lidar_(nullptr), last_imu_
 { 
   Eigen::Quaterniond q;
   Eigen::Vector3d t(0, 0, 0);
-  if (frameID == "hesai_lidar") {
-    q = Eigen::Quaterniond(1, 0, 0, 0);
-  }
-  else if (frameID == "os_sensor") {
-  //else if (frameID == "sensor1/os_sensor") {
-    q = Eigen::Quaterniond(1, 0, 0, 0);
-  }
+
+  q = Eigen::Quaterniond(1, 0, 0, 0);
 
   T_i_l = Sophus::SE3d(q, t);
 }

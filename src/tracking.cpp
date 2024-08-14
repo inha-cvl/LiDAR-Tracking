@@ -1,19 +1,22 @@
 #include <iostream>
 #include "cloud_processor/cloud_processor.hpp"
 
-ros::Publisher pub_track_box, pub_track_test;
+ros::Publisher pub_track_box;
 ros::Publisher pub_track_text;
 ros::Publisher pub_track_model;
 
 Track tracker;
 
-double t8, t9, t10, t11, total;
+double t9, t10, t11, t12, t13, total;
 std::string fixed_frame;
 
+std::vector<std::pair<float, float>> global_path;
 tf2_ros::Buffer tf_buffer;
 
-jsk_recognition_msgs::BoundingBoxArray cluster_bbox_array, deep_bbox_array, integration_bbox_array, track_bbox_array, transformed_bbox_array, corrected_bbox_array, output_bbox_array;
+jsk_recognition_msgs::BoundingBoxArray cluster_bbox_array, deep_bbox_array, integration_bbox_array, filtered_bbox_array, track_bbox_array, transformed_bbox_array, corrected_bbox_array, output_bbox_array;
 visualization_msgs::MarkerArray track_text_array, track_model_array;
+
+std::string lidar_frame, target_frame, world_frame;
 
 // clustering이 더 오래 걸려서 callbackCluster에서 integration
 void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
@@ -21,17 +24,18 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
     if (bba_msg->boxes.empty()) { return; }
 
     cluster_bbox_array = *bba_msg;
-    integrationBbox(cluster_bbox_array, deep_bbox_array, integration_bbox_array, t8);
-    tracking(tracker, integration_bbox_array, track_bbox_array, track_text_array, bba_msg->header.stamp, t9);
+    integrationBbox(cluster_bbox_array, deep_bbox_array, integration_bbox_array, t9);
+    cropBboxHDMap(integration_bbox_array, filtered_bbox_array, bba_msg->header.stamp, tf_buffer, target_frame, world_frame, global_path, t10);
+    tracking(tracker, filtered_bbox_array, track_bbox_array, track_text_array, bba_msg->header.stamp, t11);
     
-    if (checkTransform(tf_buffer, frameID, target_frame) == true) {
-        transformBbox(track_bbox_array, frameID, target_frame, tf_buffer, transformed_bbox_array, t10);
-        correctionBbox(transformed_bbox_array, bba_msg->header.stamp, target_frame, world_frame, tf_buffer, corrected_bbox_array, t11);
+    if (checkTransform(tf_buffer, lidar_frame, target_frame) == true) {
+        transformBbox(track_bbox_array, lidar_frame, target_frame, tf_buffer, transformed_bbox_array, t12);
+        correctionBbox(transformed_bbox_array, bba_msg->header.stamp, target_frame, world_frame, tf_buffer, corrected_bbox_array, t13);
         fixed_frame = target_frame;
         output_bbox_array = corrected_bbox_array;
     }
     else {
-        fixed_frame = frameID;
+        fixed_frame = lidar_frame;
         output_bbox_array = track_bbox_array;
     }
     
@@ -41,12 +45,12 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
     
     total = ros::Time::now().toSec() - cluster_bbox_array.boxes[0].header.stamp.toSec();
 
-    // std::cout << "\033[" << 17 << ";" << 30 << "H" << std::endl;
-    // std::cout << "integration : " << t8 << "sec" << std::endl;
-    // std::cout << "tracking : " << t9 << "sec" << std::endl;
-    // std::cout << "transform & correction : " << t10+t11 << "sec" << std::endl;
-    // std::cout << "total : " << total << " sec" << std::endl;
-    // std::cout << "fixed frame : " << fixed_frame << std::endl;
+    std::cout << "\033[" << 18 << ";" << 30 << "H" << std::endl;
+    std::cout << "integration & crophdmap : " << t9+t10 << "sec" << std::endl;
+    std::cout << "tracking : " << t11 << "sec" << std::endl;
+    std::cout << "transform & correction : " << t12+t13 << "sec" << std::endl;
+    std::cout << "total : " << total << " sec" << std::endl;
+    std::cout << "fixed frame : " << fixed_frame << std::endl;
 }
 
 void callbackDeep(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
@@ -64,6 +68,11 @@ int main(int argc, char**argv)
     ros::NodeHandle nh;
     ros::NodeHandle pnh("~");
     tf2_ros::TransformListener tf_listener(tf_buffer);
+    global_path = map_reader();
+
+    pnh.param<string>("lidar_frame", lidar_frame, "hesai_lidar");
+    pnh.param<string>("target_frame", target_frame, "ego_car");
+    pnh.param<string>("world_frame", world_frame, "world");
 
     pub_track_box = pnh.advertise<jsk_recognition_msgs::BoundingBoxArray>("/mobinha/perception/lidar/track_box", 1);
     pub_track_text = pnh.advertise<visualization_msgs::MarkerArray>("/mobinha/visualize/visualize/track_text", 1);
