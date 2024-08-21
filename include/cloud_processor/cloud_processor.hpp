@@ -1,5 +1,9 @@
 #include "utils.hpp"
 
+// TODO
+// std_msg::Bool True -> Lidar OK False -> Lidar Error
+
+
 template <typename PointT>
 class CloudProcessor {
 public:
@@ -22,10 +26,12 @@ public:
         nh_.getParam("clustering/filter/max_size/z", filter_max_size_z);
         nh_.getParam("clustering/adaptive/min_size", adaptive_min_size);
         nh_.getParam("clustering/adaptive/max_size", adaptive_max_size);
-        nh_.getParam("clustering/adaptive/start_tolerance", start_tolerance);
-        nh_.getParam("clustering/adaptive/delta_tolerance", delta_tolerance);
-        nh_.getParam("clustering/adaptive/max_region", max_region);
+        nh_.getParam("clustering/adaptive/min_tolerance", min_tolerance);
+        nh_.getParam("clustering/adaptive/max_tolerance", max_tolerance);
+        nh_.getParam("clustering/adaptive/max_region_distance", max_region_distance);
         nh_.getParam("clustering/adaptive/number_region", number_region);
+        nh_.getParam("clustering/adaptive/min_leaf_size", min_leaf_size);
+        nh_.getParam("clustering/adaptive/max_leaf_size", max_leaf_size);
         nh_.getParam("clustering/adaptive/threshIOU", threshIOU);
         nh_.getParam("clustering/L_shape_fitting/projection_range", projection_range);
         nh_.getParam("ROI/crop/max/x", roi_max_x);
@@ -56,6 +62,10 @@ public:
     void fittingLShape(const std::vector<pcl::PointCloud<pcl::PointXYZ>>& inputClusters, const std::string lidar_frame,
                         jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken);
 
+    void adaptiveVoxelClustering(const pcl::PointCloud<PointT>& cloudIn, 
+                                                     std::vector<pcl::PointCloud<pcl::PointXYZ>>& outputClusters, 
+                                                     double& time_taken);
+
 private:
     ros::NodeHandle nh_;
     int V_SCAN; // Vertical scan lines
@@ -80,10 +90,12 @@ private:
     // Adaptive clustering settings
     int adaptive_min_size; // Minimum cluster size in points
     int adaptive_max_size; // Maximum cluster size in points
-    float start_tolerance; // Start tolerance for clustering
-    float delta_tolerance; // Delta tolerance increment in clustering
-    int max_region; // Maximum regions for clustering
+    float min_tolerance; // Start tolerance for clustering
+    float max_tolerance; // Delta tolerance increment in clustering
+    int max_region_distance; // Maximum regions for clustering
     int number_region; // Number of regions for adaptive clustering
+    float min_leaf_size;
+    float max_leaf_size;
     float threshIOU; // Intersection over Union threshold for clustering
 
     // L-shape fitting parameters
@@ -112,6 +124,7 @@ private:
     std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer;
     const size_t MAX_IMU_BUFFER_SIZE = 1000;
     Eigen::Quaterniond rotation = Eigen::Quaterniond(1, 0, 0, 0);
+    Eigen::Quaterniond pre_rotation = Eigen::Quaterniond(1, 0, 0, 0);
     ros::Time rotation_stamp;
 };
 
@@ -159,8 +172,7 @@ void CloudProcessor<PointT>::projectPointCloud(const pcl::PointCloud<PointT>& cl
     }
 
     cloudOut.clear();
-    cloudOut.reserve(cloudIn.size());
-    //cloudOut.points.resize(V_SCAN * H_SCAN, PointT());
+    cloudOut.points.resize(V_SCAN * H_SCAN, PointT());
 
     std::vector<float> channelAngles = {14.985, 13.283, 11.758, 10.483, 9.836, 9.171, 8.496, 7.812, 7.462, 7.115, 6.767, 6.416, 6.064, 5.71,
                                         5.355, 4.998, 4.643, 4.282, 3.921, 3.558, 3.194, 2.829, 2.463, 2.095, 1.974, 1.854, 1.729, 1.609, 1.487, 1.362, 1.242, 1.12, 0.995, 0.875, 0.75,
@@ -243,9 +255,9 @@ void CloudProcessor<PointT>::cropPointCloud(const pcl::PointCloud<PointT>& cloud
     for (const auto& point : cloudIn.points) {
 
         // ring filtering
-        // if (crop_ring_enabled && point.ring % crop_ring == 0) { continue; }
+        if (crop_ring_enabled && point.ring % crop_ring == 0) { continue; }
         // intensity filtering
-        // if (crop_intensity_enabled && point.intensity < crop_intensity) { continue; }
+        if (crop_intensity_enabled && point.intensity < crop_intensity) { continue; }
         
         // Car exclusion
         if (point.x >= -2.0 && point.x <= 2.0 &&
@@ -458,6 +470,12 @@ void CloudProcessor<PointT>::undistortPointCloud(const pcl::PointCloud<PointT>& 
         return;
     }
 
+    if (rotation.coeffs().isApprox(pre_rotation.coeffs())) {
+        cloudOut = cloudIn;
+        return;
+    }
+
+
     // Convert the quaternion to SO3 for easier manipulation and calculate its inverse
     Sophus::SO3d final_so3(rotation);
     Sophus::SO3d inverse_so3 = final_so3.inverse();
@@ -486,6 +504,8 @@ void CloudProcessor<PointT>::undistortPointCloud(const pcl::PointCloud<PointT>& 
         //cloudOut.points[i] = new_point;
         cloudOut.points.push_back(new_point);
     }
+
+    pre_rotation = rotation;
 
     auto end_time = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end_time - start_time;
@@ -517,7 +537,7 @@ void CloudProcessor<PointT>::downsamplingPointCloud(const pcl::PointCloud<PointT
     time_taken = elapsed_seconds.count();
 }
 
-
+/*
 template<typename PointT> inline
 void CloudProcessor<PointT>::adaptiveClustering(const pcl::PointCloud<pcl::PointXYZ>& cloudIn, 
                                                 std::vector<pcl::PointCloud<pcl::PointXYZ>>& outputClusters, double& time_taken) 
@@ -598,8 +618,8 @@ void CloudProcessor<PointT>::adaptiveClustering(const pcl::PointCloud<pcl::Point
     std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
     time_taken = elapsed.count();
 }
-
-
+*/
+/*
 template<typename PointT> inline
 void CloudProcessor<PointT>::voxelClustering(const pcl::PointCloud<PointT>& cloudIn, 
                                              std::vector<pcl::PointCloud<pcl::PointXYZ>>& outputClusters, double& time_taken) 
@@ -695,9 +715,115 @@ void CloudProcessor<PointT>::voxelClustering(const pcl::PointCloud<PointT>& clou
     std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
     time_taken = elapsed.count();
 }
+*/
 
+template<typename PointT> inline
+void CloudProcessor<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<PointT>& cloudIn, 
+                                                     std::vector<pcl::PointCloud<pcl::PointXYZ>>& outputClusters, 
+                                                     double& time_taken) 
+{
+    auto start = std::chrono::high_resolution_clock::now();
 
+    if (cloudIn.points.empty()) {
+        std::cerr << "Input cloud is empty! <- adaptiveVoxelClustering" << std::endl;
+        return;
+    }
 
+    outputClusters.clear();
+    outputClusters.reserve(cloudIn.size());
+
+    // Convert the input cloud to pcl::PointXYZ type
+    pcl::PointCloud<pcl::PointXYZ> xyzCloud;
+    pcl::copyPointCloud(cloudIn, xyzCloud);
+
+    // 구간별 거리 단계 설정
+    std::vector<float> regions(number_region, max_region_distance / number_region); // 10m씩 증가하는 구간
+    std::vector<std::vector<int>> indices_array(number_region + 1); // 추가적으로 100m 이후를 위한 구간 추가
+
+    // 포인트 클라우드를 구간별로 분류
+    for (int i = 0; i < xyzCloud.size(); i++) {
+        float distance = std::sqrt(xyzCloud.points[i].x * xyzCloud.points[i].x + xyzCloud.points[i].y * xyzCloud.points[i].y);
+        if (distance > max_region_distance) {
+            // 100m 이후의 포인트는 마지막 구간에 배치
+            indices_array[number_region].push_back(i);
+        } else {
+
+            // 100m 이후의 포인트는 마지막 구간에 배치
+            if (distance > max_region_distance) {
+                indices_array[number_region].push_back(i);
+            } else {
+                // 구간을 계산하여 인덱스 선택
+                int region_index = static_cast<int>(distance / (max_region_distance / number_region));
+                indices_array[region_index].push_back(i);
+            }
+        }
+    }
+
+    // Iterate over each region and apply voxel grid filtering and clustering
+    #pragma omp parallel for
+    for (int i = 0; i <= number_region; i++) {
+        if (indices_array[i].empty()) continue;
+
+        pcl::PointCloud<pcl::PointXYZ> cloudSegment;
+        for (int index : indices_array[i]) {
+            cloudSegment.points.push_back(xyzCloud.points[index]);
+        }
+
+        if (i != number_region) {
+            // 100m 이전의 구간 처리 (복셀화 적용)
+            pcl::VoxelGrid<pcl::PointXYZ> voxel_grid_filter;
+            float leaf_size = max_leaf_size - (i * (max_leaf_size - min_leaf_size) / (number_region - 1)); // 구간별 leaf_size 계산
+            voxel_grid_filter.setLeafSize(leaf_size, leaf_size, leaf_size);
+            voxel_grid_filter.setInputCloud(boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>(cloudSegment));
+
+            pcl::PointCloud<pcl::PointXYZ> downsampledCloud;
+            voxel_grid_filter.filter(downsampledCloud);
+            cloudSegment = downsampledCloud; // 다운샘플링된 클라우드로 업데이트
+        }
+
+        // Perform Euclidean clustering
+        pcl::search::KdTree<pcl::PointXYZ> tree;
+        tree.setInputCloud(boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>(cloudSegment));
+
+        std::vector<pcl::PointIndices> cluster_indices;
+        pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+        float tolerance = (i == number_region) ? max_tolerance : min_tolerance + (i * (max_tolerance - min_tolerance) / (number_region - 1)); // 구간별 tolerance 계산
+        ec.setClusterTolerance(tolerance);
+        ec.setMinClusterSize(adaptive_min_size);  // 원래 코드에 있던 adaptive_min_size 사용
+        ec.setMaxClusterSize(adaptive_max_size);  // 원래 코드에 있던 adaptive_max_size 사용
+        ec.setSearchMethod(boost::make_shared<pcl::search::KdTree<pcl::PointXYZ>>(tree));
+        ec.setInputCloud(boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>(cloudSegment));
+        ec.extract(cluster_indices);
+
+        // Cluster size filtering and output storage
+        for (auto& indices : cluster_indices) {
+            pcl::PointCloud<pcl::PointXYZ> cluster;
+            for (int idx : indices.indices) {
+                cluster.points.push_back(cloudSegment.points[idx]);
+            }
+            cluster.width = cluster.size();
+            cluster.height = 1;
+            cluster.is_dense = true;
+
+            pcl::PointXYZ minPt, maxPt;
+            pcl::getMinMax3D(cluster, minPt, maxPt);
+            double clusterSizeX = maxPt.x - minPt.x;
+            double clusterSizeY = maxPt.y - minPt.y;
+            double clusterSizeZ = maxPt.z - minPt.z;
+
+            #pragma omp critical
+            if (clusterSizeX > filter_min_size_x && clusterSizeX < filter_max_size_x &&
+                clusterSizeY > filter_min_size_y && clusterSizeY < filter_max_size_y &&
+                clusterSizeZ > filter_min_size_z && clusterSizeZ < filter_max_size_z) {
+                outputClusters.push_back(cluster);
+            }
+        }
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
+    time_taken = elapsed.count();
+}
 
 template<typename PointT> inline
 void CloudProcessor<PointT>::fittingLShape(const std::vector<pcl::PointCloud<pcl::PointXYZ>>& inputClusters, 
@@ -741,11 +867,25 @@ void CloudProcessor<PointT>::fittingLShape(const std::vector<pcl::PointCloud<pcl
         output_bbox_array.boxes.push_back(bbox);
     }
 
-    for (int i = 0; i < output_bbox_array.boxes.size(); i++) {
-        for (int j = 0; j < output_bbox_array.boxes.size(); j++) {
+    for (int i = 0; i < output_bbox_array.boxes.size(); ++i) {
+        for (int j = i + 1; j < output_bbox_array.boxes.size();) {
             double overlap = getBBoxOverlap(output_bbox_array.boxes[j], output_bbox_array.boxes[i]);
-            if (i != j && overlap > threshIOU) {
-                output_bbox_array.boxes.erase(output_bbox_array.boxes.begin() + j);
+            if (overlap > threshIOU) {
+                auto& box_i = output_bbox_array.boxes[i];
+                auto& box_j = output_bbox_array.boxes[j];
+
+                double volume_i = box_i.dimensions.x * box_i.dimensions.y * box_i.dimensions.z;
+                double volume_j = box_j.dimensions.x * box_j.dimensions.y * box_j.dimensions.z;
+
+                if (volume_i >= volume_j) {
+                    output_bbox_array.boxes.erase(output_bbox_array.boxes.begin() + j);
+                } else {
+                    output_bbox_array.boxes.erase(output_bbox_array.boxes.begin() + i);
+                    --i;
+                    break;
+                }
+            } else {
+                ++j;
             }
         }
     }

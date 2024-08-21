@@ -6,7 +6,6 @@
 <arg name="target_frame" default="ego_car"/>
 <arg name="world_frame" default="world"/>
 
-
   <node name="cloud_segmentation" pkg="lidar_tracking" type="cloud_segmentation" output="screen">
     <rosparam command="load" file="$(find lidar_tracking)/config/patchworkpp_hesai.yaml" />
     <rosparam command="load" file="$(find lidar_tracking)/config/adaptive_param.yaml" />
@@ -15,7 +14,6 @@
     <param name="imu_topic" value="$(arg imu_topic)"/>
     <param name="target_frame" value="$(arg target_frame)"/>
     <param name="world_frame" value="$(arg world_frame)"/>
-
   </node>
   
   <node name="tracking" pkg="lidar_tracking" type="tracking" output="screen">

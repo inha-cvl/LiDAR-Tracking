@@ -24,24 +24,26 @@ clustering:
   adaptive:
     min_size: 10
     max_size: 2000
-    start_tolerance: 0.2
-    delta_tolerance: 0.16
-    max_region: 120
-    number_region: 5
-    threshIOU: 0.1
+    min_tolerance: 0.7
+    max_tolerance: 1.2
+    max_region_distance: 100
+    number_region: 10
+    min_leaf_size: 0.2
+    max_leaf_size: 0.4
+    threshIOU: 0.3
   L_shape_fitting:
     projection_range: 0.2
 
 ROI:
   crop:
     max:
-      x: 120
-      y: 80.0
+      x: 150
+      y: 40.0
       z: -0.3
     min:
       x: -80
-      y: -80.0
-      z: -2.5
+      y: -40.0
+      z: -1.7
     crop_ring:
       enabled: false
       ring: 2

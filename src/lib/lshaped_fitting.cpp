@@ -10,6 +10,7 @@ LShapedFIT::LShapedFIT()
     min_dist_of_nearest_crit_ = 0.1; // 0.01
     dtheta_deg_for_search_    = 4.0; // 1.0
 
+    // criterion_ = LShapedFIT::AREA;
     //criterion_ = LShapedFIT::VARIANCE;
     criterion_ = LShapedFIT::NEAREST;
 

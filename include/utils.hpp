@@ -166,26 +166,39 @@ visualization_msgs::MarkerArray bba2ma(const jsk_recognition_msgs::BoundingBoxAr
 
 double getBBoxOverlap(jsk_recognition_msgs::BoundingBox bbox1, jsk_recognition_msgs::BoundingBox bbox2)
 {
-	double boxA[4] = {bbox1.pose.position.x - bbox1.dimensions.x/2.0, 
-					 bbox1.pose.position.y - bbox1.dimensions.y/2.0, 
-					 bbox1.pose.position.x + bbox1.dimensions.x/2.0, 
-					 bbox1.pose.position.y + bbox1.dimensions.y/2.0};
- 	double boxB[4] = {bbox2.pose.position.x - bbox2.dimensions.x/2.0, 
-					 bbox2.pose.position.y - bbox2.dimensions.y/2.0, 
-					 bbox2.pose.position.x + bbox2.dimensions.x/2.0, 
-					 bbox2.pose.position.y + bbox2.dimensions.y/2.0};
-	double xA = std::max(boxA[0], boxB[0]);
-	double yA = std::max(boxA[1], boxB[1]);
-	double xB = std::min(boxA[2], boxB[2]);
-	double yB = std::min(boxA[3], boxB[3]);
+    double boxA[4] = {
+        bbox1.pose.position.x - bbox1.dimensions.x / 2.0, 
+        bbox1.pose.position.y - bbox1.dimensions.y / 2.0, 
+        bbox1.pose.position.x + bbox1.dimensions.x / 2.0, 
+        bbox1.pose.position.y + bbox1.dimensions.y / 2.0
+    };
+    
+    double boxB[4] = {
+        bbox2.pose.position.x - bbox2.dimensions.x / 2.0, 
+        bbox2.pose.position.y - bbox2.dimensions.y / 2.0, 
+        bbox2.pose.position.x + bbox2.dimensions.x / 2.0, 
+        bbox2.pose.position.y + bbox2.dimensions.y / 2.0
+    };
+    
+    // Calculate the intersection points
+    double xA = std::max(boxA[0], boxB[0]);
+    double yA = std::max(boxA[1], boxB[1]);
+    double xB = std::min(boxA[2], boxB[2]);
+    double yB = std::min(boxA[3], boxB[3]);
 
-	double interArea = std::max(0.0, xB - xA + 1) * std::max(0.0, yB - yA + 1);
- 	double boxAArea = (boxA[2] - boxA[0] + 1) * (boxA[3] - boxA[1] + 1);
+    // Calculate the intersection area (without the +1 offset)
+    double interArea = std::max(0.0, xB - xA) * std::max(0.0, yB - yA);
+    if (interArea == 0.0) return 0.0; // No overlap
 
-	double overlap = interArea / boxAArea;
+    // Calculate the area of box A (without the +1 offset)
+    double boxAArea = (boxA[2] - boxA[0]) * (boxA[3] - boxA[1]);
 
-	return overlap;
+    // Calculate the overlap ratio
+    double overlap = interArea / boxAArea;
+
+    return overlap;
 }
+
 
 std::vector<cv::Point2f> pcl2Point2f(const pcl::PointCloud<pcl::PointXYZ>& cloud, double projection_range)
 {
@@ -208,7 +221,6 @@ std::vector<cv::Point2f> pcl2Point2f(const pcl::PointCloud<pcl::PointXYZ>& cloud
         // cv::Point2f point2f(point.x, point.y);
         // points.push_back(point2f);
     }
-    
     
     return points;
 }
