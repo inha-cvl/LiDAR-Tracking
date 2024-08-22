@@ -261,7 +261,7 @@ std::vector<std::pair<float, float>> map_reader()
 
     // ROS 패키지 경로 얻기
     std::string package_path = ros::package::getPath("lidar_tracking");
-    std::string json_file_path = package_path + "/map/kiapi.json";  // 상대 경로 사용
+    std::string json_file_path = package_path + "/map/solchan.json";  // 상대 경로 사용
 
     std::ifstream t(json_file_path);
     if (!t.is_open()) {
