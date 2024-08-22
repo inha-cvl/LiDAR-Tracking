@@ -402,7 +402,7 @@ void cropBboxHDMap(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_arra
 
     geometry_msgs::TransformStamped transformStamped;
     try {
-        transformStamped = tf_buffer.lookupTransform(world_frame, target_frame, input_stamp); // input_stamp
+        transformStamped = tf_buffer.lookupTransform(world_frame, target_frame, ros::Time(0)); // input_stamp
     } catch (tf2::TransformException &ex) {
         // ROS_WARN("%s", ex.what());
         output_bbox_array = input_bbox_array;

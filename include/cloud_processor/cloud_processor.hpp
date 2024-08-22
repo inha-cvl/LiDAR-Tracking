@@ -434,7 +434,7 @@ void CloudProcessor<PointT>::cropPointCloudHDMap(const pcl::PointCloud<PointT>& 
     }
 
     // Transform and filter points based on proximity to the selected global path range
-    #pragma omp parallel for
+    // #pragma omp parallel for
     for (const auto& point : cloudIn.points) {
         geometry_msgs::Point geo_point;
         geo_point.x = point.x;
@@ -447,7 +447,7 @@ void CloudProcessor<PointT>::cropPointCloudHDMap(const pcl::PointCloud<PointT>& 
         for (int idx : indices) {
             double distance = std::hypot(global_path[idx].first - transformed_point.x, global_path[idx].second - transformed_point.y);
             if (distance <= crop_hd_map_radius) {
-                #pragma omp critical
+                // #pragma omp critical
                 cloudOut.points.push_back(point);
                 break;
             }
