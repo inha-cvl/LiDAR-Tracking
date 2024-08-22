@@ -417,7 +417,7 @@ void cropBboxHDMap(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_arra
         bool within_range = false;
         for (const auto& path_point : global_path) {
             double distance = std::hypot(path_point.first - transformed_point.x, path_point.second - transformed_point.y);
-            if (distance <= 5.0) {
+            if (distance <= 4.7) {
                 within_range = true;
                 break;
             }
