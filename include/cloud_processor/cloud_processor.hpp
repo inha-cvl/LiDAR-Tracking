@@ -760,7 +760,7 @@ void CloudProcessor<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<Point
     }
 
     // Iterate over each region and apply voxel grid filtering and clustering
-    #pragma omp parallel for
+    // #pragma omp parallel for 
     for (int i = 0; i <= number_region; i++) {
         if (indices_array[i].empty()) continue;
 
@@ -811,7 +811,7 @@ void CloudProcessor<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<Point
             double clusterSizeY = maxPt.y - minPt.y;
             double clusterSizeZ = maxPt.z - minPt.z;
 
-            #pragma omp critical
+            // #pragma omp critical
             if (clusterSizeX > filter_min_size_x && clusterSizeX < filter_max_size_x &&
                 clusterSizeY > filter_min_size_y && clusterSizeY < filter_max_size_y &&
                 clusterSizeZ > filter_min_size_z && clusterSizeZ < filter_max_size_z) {

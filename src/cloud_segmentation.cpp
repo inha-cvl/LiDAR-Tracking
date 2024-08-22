@@ -53,8 +53,8 @@ void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
     CloudSegmentation->cropPointCloud(fullCloud, cropCloud, t3);
     // pub_crop_cloud.publish(cloud2msg(cropCloud, input_stamp, lidar_frame));
 
-    CloudSegmentation->cropPointCloudHDMap(cropCloud, groundCloud, tf_buffer, target_frame, world_frame, global_path, t4);
-    // pub_ground.publish(cloud2msg(groundCloud, input_stamp, lidar_frame));
+    // CloudSegmentation->cropPointCloudHDMap(cropCloud, groundCloud, tf_buffer, target_frame, world_frame, global_path, t4);
+    // // pub_ground.publish(cloud2msg(groundCloud, input_stamp, lidar_frame));
 
     PatchworkppGroundSeg->estimate_ground(cropCloud, groundCloud, nonGroundCloud, t4);
     // pub_non_ground.publish(cloud2msg(nonGroundCloud, input_stamp, lidar_frame));
@@ -62,11 +62,11 @@ void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
     CloudSegmentation->undistortPointCloud(nonGroundCloud, undistortionCloud, t5);
     pub_undistortion_cloud.publish(cloud2msg(undistortionCloud, input_stamp, lidar_frame));
 
-    // CloudSegmentation->downsamplingPointCloud(undistortionCloud, downsamplingCloud, t6);
-    // pub_downsampling_cloud.publish(cloud2msg(downsamplingCloud, input_stamp, lidar_frame));
+    // // CloudSegmentation->downsamplingPointCloud(undistortionCloud, downsamplingCloud, t6);
+    // // pub_downsampling_cloud.publish(cloud2msg(downsamplingCloud, input_stamp, lidar_frame));
 
     CloudSegmentation->adaptiveVoxelClustering(undistortionCloud, cluster_array, t7);
-    //CloudSegmentation->voxelClustering(undistortionCloud, cluster_array, t7);
+    // //CloudSegmentation->voxelClustering(undistortionCloud, cluster_array, t7);
     // CloudSegmentation->adaptiveClustering(downsamplingCloud, cluster_array, t7);
     // pub_cluster_array.publish(cluster2msg(cluster_array, input_stamp, lidar_frame));
     CloudSegmentation->fittingLShape(cluster_array, lidar_frame, cluster_bbox_array, t8);
