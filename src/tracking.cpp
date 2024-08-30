@@ -67,6 +67,8 @@ int main(int argc, char** argv)
     tf2_ros::TransformListener tf_listener(tf_buffer);
     global_path = map_reader();
 
+    //std::atexit(Tracking_->);
+
     pnh.param<std::string>("lidar_frame", lidar_frame, "hesai_lidar");
     pnh.param<std::string>("target_frame", target_frame, "ego_car");
     pnh.param<std::string>("world_frame", world_frame, "world");
@@ -80,6 +82,8 @@ int main(int argc, char** argv)
 
     ros::Subscriber sub_cluster_box = nh.subscribe("/cloud_segmentation/cluster_box", 1, callbackCluster);
     ros::Subscriber sub_deep_box = nh.subscribe("/deep_box", 1, callbackDeep);
+
+    std::atexit([]() { Tracking_->averageTime(); });
 
     ros::spin();
     return 0;

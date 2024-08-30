@@ -8,6 +8,13 @@ public:
         // ROS Parameters
         nh_.getParam("Tracking/integration/threshIOU", threshIOU);
         nh_.getParam("Tracking/crop_hd_map/radius", crop_hd_map_radius);
+
+        clearLogFile(integration_time_log_path);
+        clearLogFile(crophdmap_time_log_path);
+        clearLogFile(tracking_time_log_path);
+        clearLogFile(transform_time_log_path);
+        clearLogFile(correction_time_log_path);
+        clearLogFile(average_time_log_path);
     }
 
     void integrationBbox(const jsk_recognition_msgs::BoundingBoxArray &cluster_bbox_array, 
@@ -30,16 +37,27 @@ public:
     void correctionBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, const ros::Time &input_stamp, 
                         const std::string &target_frame, const std::string &world_frame, tf2_ros::Buffer &tf_buffer,
                         jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken);
+    
+    void averageTime();
 
 private:
     ros::NodeHandle nh_;
     float threshIOU;    // IOU threshold for bounding box integration
     double crop_hd_map_radius; // Minimum distance threshold for HD map cropping
+
+    // average time check
+    std::string package_path = ros::package::getPath("lidar_tracking") + "/time_log/tracking/";
+    std::string integration_time_log_path = package_path + "integration.txt";
+    std::string crophdmap_time_log_path = package_path + "crophdmap.txt";
+    std::string tracking_time_log_path = package_path + "tracking.txt";
+    std::string transform_time_log_path = package_path + "transform.txt";
+    std::string correction_time_log_path = package_path + "correction.txt";
+    std::string average_time_log_path = package_path + "average.txt";
 };
 
 void Tracking::integrationBbox(const jsk_recognition_msgs::BoundingBoxArray &cluster_bbox_array, 
                                const jsk_recognition_msgs::BoundingBoxArray &deep_bbox_array,
-                               jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken) 
+                               jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double& time_taken) 
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -62,12 +80,13 @@ void Tracking::integrationBbox(const jsk_recognition_msgs::BoundingBoxArray &clu
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
+    saveTimeToFile(integration_time_log_path, time_taken);
 }
 
 void Tracking::cropBboxHDMap(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, 
                              jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, 
                              const ros::Time &input_stamp, tf2_ros::Buffer &tf_buffer, const std::string target_frame, 
-                             const std::string world_frame, const std::vector<std::pair<float, float>> &global_path, double &time_taken) 
+                             const std::string world_frame, const std::vector<std::pair<float, float>> &global_path, double& time_taken) 
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -102,11 +121,12 @@ void Tracking::cropBboxHDMap(const jsk_recognition_msgs::BoundingBoxArray &input
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
+    saveTimeToFile(crophdmap_time_log_path, time_taken);
 }
 
 void Tracking::tracking(Track &tracker, const jsk_recognition_msgs::BoundingBoxArray &bbox_array, 
                         jsk_recognition_msgs::BoundingBoxArray &track_bbox_array, visualization_msgs::MarkerArray &track_text_array,
-                        const ros::Time &stamp, double &time_taken)
+                        const ros::Time &stamp, double& time_taken)
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -125,11 +145,12 @@ void Tracking::tracking(Track &tracker, const jsk_recognition_msgs::BoundingBoxA
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
+    saveTimeToFile(tracking_time_log_path, time_taken);
 }
 
 void Tracking::transformBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, const std::string &frame_id, 
                              const std::string &target_frame, tf2_ros::Buffer &tf_buffer,
-                             jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken) 
+                             jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double& time_taken) 
 {
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -162,11 +183,12 @@ void Tracking::transformBbox(const jsk_recognition_msgs::BoundingBoxArray &input
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
+    saveTimeToFile(transform_time_log_path, time_taken);
 }
 
 void Tracking::correctionBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, const ros::Time &input_stamp, 
                               const std::string &target_frame, const std::string &world_frame, tf2_ros::Buffer &tf_buffer,
-                              jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken) 
+                              jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double& time_taken) 
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -209,4 +231,23 @@ void Tracking::correctionBbox(const jsk_recognition_msgs::BoundingBoxArray &inpu
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
+    saveTimeToFile(correction_time_log_path, time_taken);
+}
+
+void Tracking::averageTime()
+{
+    std::ofstream file(average_time_log_path, std::ios::app);
+
+    if (!file.is_open()) {
+        std::cerr << "Error opening file: " << average_time_log_path << std::endl;
+        return;
+    }
+
+    file << "integration : " << calculateAverageTime(integration_time_log_path) << "\n";
+    file << "crophdmap : " << calculateAverageTime(crophdmap_time_log_path) << "\n";
+    file << "tracking : " << calculateAverageTime(tracking_time_log_path) << "\n";
+    file << "transform : " << calculateAverageTime(transform_time_log_path) << "\n";
+    file << "correction : " << calculateAverageTime(correction_time_log_path) << "\n";
+
+    file.close();
 }

@@ -41,6 +41,17 @@ public:
         nh_.getParam("Cloud_Segmentation/crop/crop_intensity/enabled", crop_intensity_enabled);
         nh_.getParam("Cloud_Segmentation/crop/crop_intensity/intensity", crop_intensity);
         nh_.getParam("Cloud_Segmentation/crop/crop_hd_map/radius", crop_hd_map_radius);
+
+        // clear log
+        clearLogFile(projection_time_log_path);
+        clearLogFile(convert_time_log_path);
+        clearLogFile(crop_time_log_path);
+        clearLogFile(crophdmap_time_log_path);
+        clearLogFile(undistortion_time_log_path);
+        clearLogFile(downsampling_time_log_path);
+        clearLogFile(clustering_time_log_path);
+        clearLogFile(lshape_time_log_path);
+        clearLogFile(average_time_log_path);
     }
 
     void msgToPointCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg, pcl::PointCloud<PointT>& cloud);
@@ -61,6 +72,7 @@ public:
     void adaptiveVoxelClustering(const pcl::PointCloud<PointT>& cloudIn, 
                                                      std::vector<pcl::PointCloud<pcl::PointXYZ>>& outputClusters, 
                                                      double& time_taken);
+    void averageTime();
 
 private:
     ros::NodeHandle nh_;
@@ -122,6 +134,19 @@ private:
     Eigen::Quaterniond rotation = Eigen::Quaterniond(1, 0, 0, 0);
     Eigen::Quaterniond pre_rotation = Eigen::Quaterniond(1, 0, 0, 0);
     ros::Time rotation_stamp;
+
+    // average time check
+    std::string package_path = ros::package::getPath("lidar_tracking") + "/time_log/cloud_segmentation/";
+    std::string projection_time_log_path = package_path + "projection.txt";
+    std::string convert_time_log_path = package_path + "convert.txt";
+    std::string crop_time_log_path = package_path + "crop.txt";
+    std::string crophdmap_time_log_path = package_path + "crophdmap.txt";
+    std::string undistortion_time_log_path = package_path + "undistortion.txt";
+    std::string downsampling_time_log_path = package_path + "downsampling.txt";
+    std::string clustering_time_log_path = package_path + "clustering.txt";
+    std::string lshape_time_log_path = package_path + "lshape.txt";
+    std::string average_time_log_path = package_path + "average.txt";
+
 };
 
 template<typename PointT> inline
@@ -204,6 +229,7 @@ void CloudSegmentation<PointT>::projectPointCloud(const pcl::PointCloud<PointT>&
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
+    saveTimeToFile(projection_time_log_path, time_taken);
 }
 
 template<typename PointT> inline
@@ -233,6 +259,7 @@ void CloudSegmentation<PointT>::convertPointCloudToImage(const pcl::PointCloud<P
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
+    saveTimeToFile(convert_time_log_path, time_taken);
 }
 
 template<typename PointT> inline
@@ -286,6 +313,7 @@ void CloudSegmentation<PointT>::cropPointCloud(const pcl::PointCloud<PointT>& cl
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
+    saveTimeToFile(crop_time_log_path, time_taken);
 }
 /*
 template<typename PointT> inline
@@ -453,6 +481,7 @@ void CloudSegmentation<PointT>::cropPointCloudHDMap(const pcl::PointCloud<PointT
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
+    saveTimeToFile(crophdmap_time_log_path, time_taken);
 }
 
 template<typename PointT> inline
@@ -506,6 +535,7 @@ void CloudSegmentation<PointT>::undistortPointCloud(const pcl::PointCloud<PointT
     auto end_time = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end_time - start_time;
     time_taken = elapsed_seconds.count();
+    saveTimeToFile(undistortion_time_log_path, time_taken);
 }
 
 template<typename PointT> inline
@@ -531,6 +561,7 @@ void CloudSegmentation<PointT>::downsamplingPointCloud(const pcl::PointCloud<Poi
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
+    saveTimeToFile(downsampling_time_log_path, time_taken);
 }
 
 /*
@@ -722,6 +753,7 @@ void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<Po
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
     time_taken = elapsed.count();
+    saveTimeToFile(clustering_time_log_path, time_taken);
 }
 
 template<typename PointT> inline
@@ -792,5 +824,28 @@ void CloudSegmentation<PointT>::fittingLShape(const std::vector<pcl::PointCloud<
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
+    saveTimeToFile(lshape_time_log_path, time_taken);
+}
+
+template<typename PointT> inline
+void CloudSegmentation<PointT>::averageTime()
+{
+    std::ofstream file(average_time_log_path, std::ios::app);
+
+    if (!file.is_open()) {
+        std::cerr << "Error opening file: " << average_time_log_path << std::endl;
+        return;
+    }
+
+    file << "projection : " << calculateAverageTime(projection_time_log_path) << "\n";
+    file << "converstion : " << calculateAverageTime(convert_time_log_path) << "\n";
+    file << "crop : " << calculateAverageTime(crop_time_log_path) << "\n";
+    file << "ground removal : " << calculateAverageTime(crop_time_log_path) << "\n";
+    file << "undistortion : " << calculateAverageTime(undistortion_time_log_path) << "\n";
+    file << "downsampling : " << calculateAverageTime(downsampling_time_log_path) << "\n";
+    file << "clustering : " << calculateAverageTime(clustering_time_log_path) << "\n";
+    file << "Lshape fitting : " << calculateAverageTime(lshape_time_log_path) << "\n";
+
+    file.close();
 }
 

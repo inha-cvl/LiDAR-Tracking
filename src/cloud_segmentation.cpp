@@ -113,6 +113,9 @@ int main(int argc, char**argv) {
     ros::Subscriber sub_cloud = nh.subscribe(lidar_topic, 1, callbackCloud);
     ros::Subscriber sub_imu = nh.subscribe(imu_topic, 1, callbackIMU);
     
+    std::atexit([]() { CloudSegmentation_->averageTime(); });
+
     ros::spin();
+
     return 0;
 }

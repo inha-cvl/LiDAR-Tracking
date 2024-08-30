@@ -355,6 +355,56 @@ void compareTransforms(const geometry_msgs::TransformStamped &transform1,
     }
 }
 
+void clearLogFile(const std::string& file_path) 
+{
+    std::ofstream file(file_path, std::ios::trunc);
+    file.close();
+}
+
+void saveTimeToFile(const std::string& timing_file, double time_taken) 
+{
+    std::ofstream file(timing_file, std::ios::app);
+
+    if (!file.is_open()) {
+        std::cerr << "Error opening file: " << timing_file << std::endl;
+        return;
+    }
+
+    file << time_taken << "\n";
+    file.close();
+}
+
+double calculateAverageTime(const std::string& timing_file) 
+{
+    std::ifstream file(timing_file);
+
+    if (!file.is_open()) {
+        std::cerr << "Error opening file: " << timing_file << std::endl;
+        return -1;
+    }
+
+    std::vector<double> times;
+    double time;
+
+    // 파일에서 시간을 읽어와 벡터에 저장
+    while (file >> time) {
+        times.push_back(time);
+    }
+
+    file.close();
+
+    if (times.empty()) {
+        std::cerr << "No timing data found in file: " << timing_file << std::endl;
+        return 0;  // 시간이 없을 경우 0 반환
+    }
+
+    // 벡터의 모든 값의 합을 구한 후, 벡터 크기로 나누어 평균 계산
+    double sum = std::accumulate(times.begin(), times.end(), 0.0);
+    double average = sum / times.size();
+
+    return average;
+}
+
 /*
 void integrationBbox(const jsk_recognition_msgs::BoundingBoxArray &cluster_bbox_array, 
                     const jsk_recognition_msgs::BoundingBoxArray &deep_bbox_array,
