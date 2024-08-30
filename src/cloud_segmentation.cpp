@@ -1,12 +1,12 @@
 #include <iostream>
 #include "patchworkpp/patchworkpp.hpp"
-#include "cloud_processor/cloud_processor.hpp"
+#include "cloud_segmentation/cloud_segmentation.hpp"
 
 using PointType = PointXYZIT;
-//using PointType = pcl::PointXYZI;
+using ClusterPointType = pcl::PointXYZ;
 
 boost::shared_ptr<PatchWorkpp<PointType>> PatchworkppGroundSeg; // PatchWorkpp
-boost::shared_ptr<CloudProcessor<PointType>> CloudSegmentation;
+boost::shared_ptr<CloudSegmentation<PointType>> CloudSegmentation_;
 
 pcl::PointCloud<PointType> fullCloud, projectionCloud, cropCloud, groundCloud, nonGroundCloud, undistortionCloud;
 pcl::PointCloud<pcl::PointXYZ> downsamplingCloud;
@@ -35,14 +35,14 @@ std::vector<std::pair<float, float>> global_path;
 
 void callbackIMU(const sensor_msgs::Imu::ConstPtr &msg_in) 
 {
-    CloudSegmentation->imuUpdate(msg_in);
+    CloudSegmentation_->imuUpdate(msg_in);
 }
 
 void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
 {
     input_stamp = cloud_msg->header.stamp; // input_stamp
     
-    CloudSegmentation->msgToPointCloud(cloud_msg, fullCloud);
+    CloudSegmentation_->msgToPointCloud(cloud_msg, fullCloud);
 
     // CloudSegmentation->projectPointCloud(fullCloud, projectionCloud, t1);
     // pub_projection_cloud.publish(cloud2msg(projectionCloud, input_stamp, lidar_frame));
@@ -50,7 +50,7 @@ void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
     // CloudSegmentation->convertPointCloudToImage(projectionCloud, projectionImage, t2);
     // pub_projection_image.publish(image2msg(projectionImage, input_stamp, lidar_frame));
 
-    CloudSegmentation->cropPointCloud(fullCloud, cropCloud, t3);
+    CloudSegmentation_->cropPointCloud(fullCloud, cropCloud, t3);
     // pub_crop_cloud.publish(cloud2msg(cropCloud, input_stamp, lidar_frame));
 
     // CloudSegmentation->cropPointCloudHDMap(cropCloud, groundCloud, tf_buffer, target_frame, world_frame, global_path, t4);
@@ -59,17 +59,17 @@ void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
     PatchworkppGroundSeg->estimate_ground(cropCloud, groundCloud, nonGroundCloud, t4);
     // pub_non_ground.publish(cloud2msg(nonGroundCloud, input_stamp, lidar_frame));
 
-    CloudSegmentation->undistortPointCloud(nonGroundCloud, undistortionCloud, t5);
-    pub_undistortion_cloud.publish(cloud2msg(undistortionCloud, input_stamp, lidar_frame));
+    CloudSegmentation_->undistortPointCloud(nonGroundCloud, undistortionCloud, t5);
+    // pub_undistortion_cloud.publish(cloud2msg(undistortionCloud, input_stamp, lidar_frame));
 
-    // // CloudSegmentation->downsamplingPointCloud(undistortionCloud, downsamplingCloud, t6);
-    // // pub_downsampling_cloud.publish(cloud2msg(downsamplingCloud, input_stamp, lidar_frame));
+    CloudSegmentation_->downsamplingPointCloud(undistortionCloud, downsamplingCloud, t6);
+    pub_downsampling_cloud.publish(cloud2msg(downsamplingCloud, input_stamp, lidar_frame));
 
-    CloudSegmentation->adaptiveVoxelClustering(undistortionCloud, cluster_array, t7);
-    // //CloudSegmentation->voxelClustering(undistortionCloud, cluster_array, t7);
-    // CloudSegmentation->adaptiveClustering(downsamplingCloud, cluster_array, t7);
+    CloudSegmentation_->adaptiveVoxelClustering(undistortionCloud, cluster_array, t7);
+    // //CloudSegmentation_->voxelClustering(undistortionCloud, cluster_array, t7);
+    // CloudSegmentation_->adaptiveClustering(downsamplingCloud, cluster_array, t7);
     // pub_cluster_array.publish(cluster2msg(cluster_array, input_stamp, lidar_frame));
-    CloudSegmentation->fittingLShape(cluster_array, lidar_frame, cluster_bbox_array, t8);
+    CloudSegmentation_->fittingLShape(cluster_array, lidar_frame, cluster_bbox_array, t8);
     pub_cluster_box.publish(bba2msg(cluster_bbox_array, input_stamp, lidar_frame));
 
     std::cout << "\033[2J" << "\033[" << 10 << ";" << 30 << "H" << std::endl;
@@ -98,7 +98,7 @@ int main(int argc, char**argv) {
 
     cout << "Operating cloud segementation..." << endl;
     PatchworkppGroundSeg.reset(new PatchWorkpp<PointType>(&pnh));
-    CloudSegmentation.reset(new CloudProcessor<PointType>(pnh));
+    CloudSegmentation_.reset(new CloudSegmentation<PointType>(pnh));
 
     pub_projection_cloud  = pnh.advertise<sensor_msgs::PointCloud2>("projectioncloud", 1, true);
     pub_projection_image = nh.advertise<sensor_msgs::Image>("projectedimage", 1, true);

@@ -29,12 +29,12 @@ Track::Track()
 	stateVariableDim = 4; // cx, cy, dx, dy
 	stateMeasureDim = 2;  // cx, cy
 	nextID = 0;
-	m_thres_invisibleCnt = 3;
+	m_thres_invisibleCnt = 6; // 3
 
 	//A & Q ==> Predict process
 	//H & R ==> Estimation process
 	
-	dt = 0.1;
+	dt = 0.05; // 0.01
 
 	// A
 	m_matTransition = (Mat_<float>(stateVariableDim, stateVariableDim) << 1, 0, dt, 0,
@@ -149,7 +149,7 @@ visualization_msgs::Marker Track::get_text_msg(struct trackingStruct &track, int
 	text.ns = "text";
 	text.id = i;
 	text.action = visualization_msgs::Marker::ADD;
-	text.lifetime = ros::Duration(0.2);
+	text.lifetime = ros::Duration(0.05);
 	text.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
 	text.color.r = 1.0;
 	text.color.g = 1.0;

@@ -1,0 +1,62 @@
+
+Cloud_Segmentation:
+  lidar_settings:
+    V_SCAN: 128 # Pandar 64 or OT 128
+    H_SCAN: 1800
+    ang_res_x: 0.2 # Calculated as 360.0 / H_SCAN
+    ang_res_y: 0.3125 # Calculated as 40.0 / V_SCAN
+    ang_bottom: 25
+
+  downsampling:
+    leaf_size:
+      x: 0.2
+      y: 0.2
+      z: 0.2
+
+  clustering:
+    filter:
+      min_size:
+        x: 0.4
+        y: 0.4
+        z: 0.4
+      max_size:
+        x: 6.0
+        y: 6.0
+        z: 3.0
+    adaptive:
+      min_size: 10
+      max_size: 2000
+      min_tolerance: 0.7
+      max_tolerance: 1.2
+      max_region_distance: 100
+      number_region: 10
+      min_leaf_size: 0.2
+      max_leaf_size: 0.4
+      threshIOU: 0.3
+    L_shape_fitting:
+      projection_range: 0.2
+
+  crop:
+    max:
+      x: 150.0
+      y: 40.0
+      z: -0.3
+    min:
+      x: -80.0
+      y: -40.0
+      z: -1.7
+    crop_ring:
+      enabled: false
+      ring: 2
+    crop_intensity:
+      enabled: false
+      intensity: 10
+    crop_hd_map:
+      radius: 5.0
+
+Tracking:
+  integration:
+    threshIOU: 0.3
+  crop_hd_map:
+    radius: 5.0
+  

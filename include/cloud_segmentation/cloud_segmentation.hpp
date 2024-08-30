@@ -1,50 +1,46 @@
 #include "utils.hpp"
 
-// TODO
-// std_msg::Bool True -> Lidar OK False -> Lidar Error
-
-
 template <typename PointT>
-class CloudProcessor {
+class CloudSegmentation {
 public:
-    CloudProcessor() {};
+    CloudSegmentation() {};
 
-    CloudProcessor(ros::NodeHandle& nh) : nh_(nh) {
-        nh_.getParam("lidar_settings/V_SCAN", V_SCAN);
-        nh_.getParam("lidar_settings/H_SCAN", H_SCAN);
-        nh_.getParam("lidar_settings/ang_res_x", ang_res_x);
-        nh_.getParam("lidar_settings/ang_res_y", ang_res_y);
-        nh_.getParam("lidar_settings/ang_bottom", ang_bottom);
-        nh_.getParam("downsampling/leaf_size/x", leaf_size_x);
-        nh_.getParam("downsampling/leaf_size/y", leaf_size_y);
-        nh_.getParam("downsampling/leaf_size/z", leaf_size_z);
-        nh_.getParam("clustering/filter/min_size/x", filter_min_size_x);
-        nh_.getParam("clustering/filter/min_size/y", filter_min_size_y);
-        nh_.getParam("clustering/filter/min_size/z", filter_min_size_z);
-        nh_.getParam("clustering/filter/max_size/x", filter_max_size_x);
-        nh_.getParam("clustering/filter/max_size/y", filter_max_size_y);
-        nh_.getParam("clustering/filter/max_size/z", filter_max_size_z);
-        nh_.getParam("clustering/adaptive/min_size", adaptive_min_size);
-        nh_.getParam("clustering/adaptive/max_size", adaptive_max_size);
-        nh_.getParam("clustering/adaptive/min_tolerance", min_tolerance);
-        nh_.getParam("clustering/adaptive/max_tolerance", max_tolerance);
-        nh_.getParam("clustering/adaptive/max_region_distance", max_region_distance);
-        nh_.getParam("clustering/adaptive/number_region", number_region);
-        nh_.getParam("clustering/adaptive/min_leaf_size", min_leaf_size);
-        nh_.getParam("clustering/adaptive/max_leaf_size", max_leaf_size);
-        nh_.getParam("clustering/adaptive/threshIOU", threshIOU);
-        nh_.getParam("clustering/L_shape_fitting/projection_range", projection_range);
-        nh_.getParam("ROI/crop/max/x", roi_max_x);
-        nh_.getParam("ROI/crop/max/y", roi_max_y);
-        nh_.getParam("ROI/crop/max/z", roi_max_z);
-        nh_.getParam("ROI/crop/min/x", roi_min_x);
-        nh_.getParam("ROI/crop/min/y", roi_min_y);
-        nh_.getParam("ROI/crop/min/z", roi_min_z);
-        nh_.getParam("ROI/crop/crop_ring/enabled", crop_ring_enabled);
-        nh_.getParam("ROI/crop/crop_ring/ring", crop_ring);
-        nh_.getParam("ROI/crop/crop_intensity/enabled", crop_intensity_enabled);
-        nh_.getParam("ROI/crop/crop_intensity/intensity", crop_intensity);
-        nh_.getParam("ROI/crop/crop_hd_map/radius", crop_hd_map_radius);
+    CloudSegmentation(ros::NodeHandle& nh) : nh_(nh) {
+        nh_.getParam("Cloud_Segmentation/lidar_settings/V_SCAN", V_SCAN);
+        nh_.getParam("Cloud_Segmentation/lidar_settings/H_SCAN", H_SCAN);
+        nh_.getParam("Cloud_Segmentation/lidar_settings/ang_res_x", ang_res_x);
+        nh_.getParam("Cloud_Segmentation/lidar_settings/ang_res_y", ang_res_y);
+        nh_.getParam("Cloud_Segmentation/lidar_settings/ang_bottom", ang_bottom);
+        nh_.getParam("Cloud_Segmentation/downsampling/leaf_size/x", leaf_size_x);
+        nh_.getParam("Cloud_Segmentation/downsampling/leaf_size/y", leaf_size_y);
+        nh_.getParam("Cloud_Segmentation/downsampling/leaf_size/z", leaf_size_z);
+        nh_.getParam("Cloud_Segmentation/clustering/filter/min_size/x", filter_min_size_x);
+        nh_.getParam("Cloud_Segmentation/clustering/filter/min_size/y", filter_min_size_y);
+        nh_.getParam("Cloud_Segmentation/clustering/filter/min_size/z", filter_min_size_z);
+        nh_.getParam("Cloud_Segmentation/clustering/filter/max_size/x", filter_max_size_x);
+        nh_.getParam("Cloud_Segmentation/clustering/filter/max_size/y", filter_max_size_y);
+        nh_.getParam("Cloud_Segmentation/clustering/filter/max_size/z", filter_max_size_z);
+        nh_.getParam("Cloud_Segmentation/clustering/adaptive/min_size", adaptive_min_size);
+        nh_.getParam("Cloud_Segmentation/clustering/adaptive/max_size", adaptive_max_size);
+        nh_.getParam("Cloud_Segmentation/clustering/adaptive/min_tolerance", min_tolerance);
+        nh_.getParam("Cloud_Segmentation/clustering/adaptive/max_tolerance", max_tolerance);
+        nh_.getParam("Cloud_Segmentation/clustering/adaptive/max_region_distance", max_region_distance);
+        nh_.getParam("Cloud_Segmentation/clustering/adaptive/number_region", number_region);
+        nh_.getParam("Cloud_Segmentation/clustering/adaptive/min_leaf_size", min_leaf_size);
+        nh_.getParam("Cloud_Segmentation/clustering/adaptive/max_leaf_size", max_leaf_size);
+        nh_.getParam("Cloud_Segmentation/clustering/adaptive/threshIOU", threshIOU);
+        nh_.getParam("Cloud_Segmentation/clustering/L_shape_fitting/projection_range", projection_range);
+        nh_.getParam("Cloud_Segmentation/crop/max/x", roi_max_x);
+        nh_.getParam("Cloud_Segmentation/crop/max/y", roi_max_y);
+        nh_.getParam("Cloud_Segmentation/crop/max/z", roi_max_z);
+        nh_.getParam("Cloud_Segmentation/crop/min/x", roi_min_x);
+        nh_.getParam("Cloud_Segmentation/crop/min/y", roi_min_y);
+        nh_.getParam("Cloud_Segmentation/crop/min/z", roi_min_z);
+        nh_.getParam("Cloud_Segmentation/crop/crop_ring/enabled", crop_ring_enabled);
+        nh_.getParam("Cloud_Segmentation/crop/crop_ring/ring", crop_ring);
+        nh_.getParam("Cloud_Segmentation/crop/crop_intensity/enabled", crop_intensity_enabled);
+        nh_.getParam("Cloud_Segmentation/crop/crop_intensity/intensity", crop_intensity);
+        nh_.getParam("Cloud_Segmentation/crop/crop_hd_map/radius", crop_hd_map_radius);
     }
 
     void msgToPointCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg, pcl::PointCloud<PointT>& cloud);
@@ -129,7 +125,7 @@ private:
 };
 
 template<typename PointT> inline
-void CloudProcessor<PointT>::msgToPointCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg, pcl::PointCloud<PointT>& cloud)
+void CloudSegmentation<PointT>::msgToPointCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg, pcl::PointCloud<PointT>& cloud)
 {
     pcl::fromROSMsg(*cloud_msg, cloud);
     pre_stamp = cur_stamp;
@@ -138,7 +134,7 @@ void CloudProcessor<PointT>::msgToPointCloud(const sensor_msgs::PointCloud2::Ptr
 }
 
 template<typename PointT> inline
-void CloudProcessor<PointT>::imuUpdate(const sensor_msgs::Imu::ConstPtr &imu_msg)
+void CloudSegmentation<PointT>::imuUpdate(const sensor_msgs::Imu::ConstPtr &imu_msg)
 {
     double timestamp = imu_msg->header.stamp.toSec();
     // ROS_DEBUG("get imu at time: %.6f", timestamp);
@@ -162,7 +158,7 @@ void CloudProcessor<PointT>::imuUpdate(const sensor_msgs::Imu::ConstPtr &imu_msg
 }
 
 template<typename PointT> inline
-void CloudProcessor<PointT>::projectPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double& time_taken) 
+void CloudSegmentation<PointT>::projectPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double& time_taken) 
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -211,7 +207,7 @@ void CloudProcessor<PointT>::projectPointCloud(const pcl::PointCloud<PointT>& cl
 }
 
 template<typename PointT> inline
-void CloudProcessor<PointT>::convertPointCloudToImage(const pcl::PointCloud<PointT>& cloudIn, cv::Mat& imageOut, double& time_taken) 
+void CloudSegmentation<PointT>::convertPointCloudToImage(const pcl::PointCloud<PointT>& cloudIn, cv::Mat& imageOut, double& time_taken) 
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -240,7 +236,7 @@ void CloudProcessor<PointT>::convertPointCloudToImage(const pcl::PointCloud<Poin
 }
 
 template<typename PointT> inline
-void CloudProcessor<PointT>::cropPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double& time_taken) 
+void CloudSegmentation<PointT>::cropPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double& time_taken) 
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -293,7 +289,7 @@ void CloudProcessor<PointT>::cropPointCloud(const pcl::PointCloud<PointT>& cloud
 }
 /*
 template<typename PointT> inline
-void CloudProcessor<PointT>::cropPointCloudHDMap(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, 
+void CloudSegmentation<PointT>::cropPointCloudHDMap(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, 
                     tf2_ros::Buffer &tf_buffer, const std::string target_frame, const std::string world_frame, 
                     const std::vector<std::pair<float, float>> &global_path, double &time_taken)
 {
@@ -387,7 +383,7 @@ void CloudProcessor<PointT>::cropPointCloudHDMap(const pcl::PointCloud<PointT>& 
 }
 */
 template<typename PointT> inline
-void CloudProcessor<PointT>::cropPointCloudHDMap(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, 
+void CloudSegmentation<PointT>::cropPointCloudHDMap(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, 
                     tf2_ros::Buffer &tf_buffer, const std::string target_frame, const std::string world_frame, 
                     const std::vector<std::pair<float, float>> &global_path, double &time_taken)
 {
@@ -460,7 +456,7 @@ void CloudProcessor<PointT>::cropPointCloudHDMap(const pcl::PointCloud<PointT>& 
 }
 
 template<typename PointT> inline
-void CloudProcessor<PointT>::undistortPointCloud(const pcl::PointCloud<PointT>& cloudIn, 
+void CloudSegmentation<PointT>::undistortPointCloud(const pcl::PointCloud<PointT>& cloudIn, 
                                                  pcl::PointCloud<PointT>& cloudOut, double &time_taken) 
 {
     auto start_time = std::chrono::steady_clock::now();
@@ -513,7 +509,7 @@ void CloudProcessor<PointT>::undistortPointCloud(const pcl::PointCloud<PointT>& 
 }
 
 template<typename PointT> inline
-void CloudProcessor<PointT>::downsamplingPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<pcl::PointXYZ>& cloudOut, double& time_taken) 
+void CloudSegmentation<PointT>::downsamplingPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<pcl::PointXYZ>& cloudOut, double& time_taken) 
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -539,7 +535,7 @@ void CloudProcessor<PointT>::downsamplingPointCloud(const pcl::PointCloud<PointT
 
 /*
 template<typename PointT> inline
-void CloudProcessor<PointT>::adaptiveClustering(const pcl::PointCloud<pcl::PointXYZ>& cloudIn, 
+void CloudSegmentation<PointT>::adaptiveClustering(const pcl::PointCloud<pcl::PointXYZ>& cloudIn, 
                                                 std::vector<pcl::PointCloud<pcl::PointXYZ>>& outputClusters, double& time_taken) 
 {
     auto start = std::chrono::high_resolution_clock::now();
@@ -619,106 +615,9 @@ void CloudProcessor<PointT>::adaptiveClustering(const pcl::PointCloud<pcl::Point
     time_taken = elapsed.count();
 }
 */
-/*
-template<typename PointT> inline
-void CloudProcessor<PointT>::voxelClustering(const pcl::PointCloud<PointT>& cloudIn, 
-                                             std::vector<pcl::PointCloud<pcl::PointXYZ>>& outputClusters, double& time_taken) 
-{
-    auto start = std::chrono::high_resolution_clock::now();
-
-    if (cloudIn.points.empty()) {
-        std::cerr << "Input cloud is empty! <- voxelClustering" << std::endl;
-        return;
-    }
-
-    outputClusters.clear();
-    outputClusters.reserve(cloudIn.size());
-
-    // Convert the input cloud to pcl::PointXYZ type
-    pcl::PointCloud<pcl::PointXYZ> xyzCloud;
-    pcl::copyPointCloud(cloudIn, xyzCloud);
-
-    // Divide the point cloud into nested circular regions
-    std::vector<float> regions(max_region, max_region / number_region); // Example: Fill regions with a distance increment of 15m each
-    std::vector<std::vector<int>> indices_array(max_region);
-
-    for (int i = 0; i < xyzCloud.size(); i++) {
-        //float distance = xyzCloud.points[i].x * xyzCloud.points[i].x + xyzCloud.points[i].y * xyzCloud.points[i].y;
-        float distance = std::sqrt(xyzCloud.points[i].x * xyzCloud.points[i].x + xyzCloud.points[i].y * xyzCloud.points[i].y);
-        float range = 0.0;
-        for (int j = 0; j < max_region; j++) {
-            //if (distance > range * range && distance <= (range + regions[j]) * (range + regions[j])) {
-            if (distance > range && distance <= (range + regions[j])) {
-                indices_array[j].push_back(i);
-                break;
-            }
-            range += regions[j];
-        }
-    }
-
-    // Apply voxel grid filter and perform Euclidean clustering for each region
-    for (int i = 0; i < max_region; i++) {
-        if (indices_array[i].empty()) continue;
-
-        pcl::PointCloud<pcl::PointXYZ> cloudSegment;
-        for (int index : indices_array[i]) {
-            cloudSegment.points.push_back(xyzCloud.points[index]);
-        }
-
-        // Define voxel grid filter
-        pcl::VoxelGrid<pcl::PointXYZ> voxel_grid_filter;
-        float leaf_size = (start_tolerance/2) / (1 + i * delta_tolerance);
-        voxel_grid_filter.setLeafSize(leaf_size, leaf_size, leaf_size);
-        voxel_grid_filter.setInputCloud(boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>(cloudSegment));
-
-        pcl::PointCloud<pcl::PointXYZ> downsampledCloud;
-        voxel_grid_filter.filter(downsampledCloud);
-
-        // Perform Euclidean clustering
-        pcl::search::KdTree<pcl::PointXYZ> tree;
-        tree.setInputCloud(boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>(downsampledCloud));
-
-        std::vector<pcl::PointIndices> cluster_indices;
-        pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-        ec.setClusterTolerance(start_tolerance + delta_tolerance * i); // Increment tolerance for farther regions
-        ec.setMinClusterSize(adaptive_min_size);
-        ec.setMaxClusterSize(adaptive_max_size);
-        ec.setSearchMethod(boost::make_shared<pcl::search::KdTree<pcl::PointXYZ>>(tree));
-        ec.setInputCloud(boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>(downsampledCloud));
-        ec.extract(cluster_indices);
-
-        for (auto& indices : cluster_indices) {
-            pcl::PointCloud<pcl::PointXYZ> cluster;
-            for (int idx : indices.indices) {
-                cluster.points.push_back(downsampledCloud.points[idx]);
-            }
-            cluster.width = cluster.size();
-            cluster.height = 1;
-            cluster.is_dense = true;
-
-            // Size filtering
-            pcl::PointXYZ minPt, maxPt;
-            pcl::getMinMax3D(cluster, minPt, maxPt);
-            double clusterSizeX = maxPt.x - minPt.x;
-            double clusterSizeY = maxPt.y - minPt.y;
-            double clusterSizeZ = maxPt.z - minPt.z;
-
-            if (clusterSizeX > filter_min_size_x && clusterSizeX < filter_max_size_x &&
-                clusterSizeY > filter_min_size_y && clusterSizeY < filter_max_size_y &&
-                clusterSizeZ > filter_min_size_z && clusterSizeZ < filter_max_size_z) {
-                outputClusters.push_back(cluster);
-            }
-        }
-    }
-
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-    time_taken = elapsed.count();
-}
-*/
 
 template<typename PointT> inline
-void CloudProcessor<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<PointT>& cloudIn, 
+void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<PointT>& cloudIn, 
                                                      std::vector<pcl::PointCloud<pcl::PointXYZ>>& outputClusters, 
                                                      double& time_taken) 
 {
@@ -826,7 +725,7 @@ void CloudProcessor<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<Point
 }
 
 template<typename PointT> inline
-void CloudProcessor<PointT>::fittingLShape(const std::vector<pcl::PointCloud<pcl::PointXYZ>>& inputClusters, 
+void CloudSegmentation<PointT>::fittingLShape(const std::vector<pcl::PointCloud<pcl::PointXYZ>>& inputClusters, 
                                            const std::string lidar_frame, jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken) 
 {
     auto start = std::chrono::steady_clock::now();

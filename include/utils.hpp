@@ -85,7 +85,7 @@ visualization_msgs::MarkerArray ta2msg(const visualization_msgs::MarkerArray& ta
         visualization_msgs::Marker temp_marker = marker;
         temp_marker.header.stamp = stamp;     
         temp_marker.header.frame_id = frame_id;
-        temp_marker.lifetime = ros::Duration(0.2);
+        temp_marker.lifetime = ros::Duration(0.05);
         ta_ROS.markers.push_back(temp_marker);
     }
 
@@ -103,7 +103,7 @@ visualization_msgs::MarkerArray bba2ma(const jsk_recognition_msgs::BoundingBoxAr
         
         visualization_msgs::Marker marker;
         marker.header.frame_id = frame_id;
-        marker.lifetime = ros::Duration(0.1);
+        marker.lifetime = ros::Duration(0.05);
         marker.header.stamp = stamp;
         marker.ns = "model";
         marker.id = i;
@@ -199,7 +199,6 @@ double getBBoxOverlap(jsk_recognition_msgs::BoundingBox bbox1, jsk_recognition_m
     return overlap;
 }
 
-
 std::vector<cv::Point2f> pcl2Point2f(const pcl::PointCloud<pcl::PointXYZ>& cloud, double projection_range)
 {
     std::vector<cv::Point2f> points;
@@ -214,7 +213,7 @@ std::vector<cv::Point2f> pcl2Point2f(const pcl::PointCloud<pcl::PointXYZ>& cloud
         if ( (point.z < center_z + projection_range && point.z > center_z - projection_range) ||
               point.z > maxPoint.z - projection_range || point.z < minPoint.z + projection_range )
         {
-            // Extract x and y coordinates from PointXYZI and create a cv::Point2f
+            // Extract x and y coordinates from PointXYZ and create a cv::Point2f
             cv::Point2f point2f(point.x, point.y);
             points.push_back(point2f);
         }
@@ -356,6 +355,7 @@ void compareTransforms(const geometry_msgs::TransformStamped &transform1,
     }
 }
 
+/*
 void integrationBbox(const jsk_recognition_msgs::BoundingBoxArray &cluster_bbox_array, 
                     const jsk_recognition_msgs::BoundingBoxArray &deep_bbox_array,
                     jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken)
@@ -550,6 +550,7 @@ void correctionBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_arr
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
 }
+*/
 
 
 /*

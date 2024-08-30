@@ -8,7 +8,7 @@
 
   <node name="cloud_segmentation" pkg="lidar_tracking" type="cloud_segmentation" output="screen">
     <rosparam command="load" file="$(find lidar_tracking)/config/patchworkpp_hesai.yaml" />
-    <rosparam command="load" file="$(find lidar_tracking)/config/adaptive_param.yaml" />
+    <rosparam command="load" file="$(find lidar_tracking)/config/params.yaml" />
     <param name="lidar_topic" value="$(arg lidar_topic)"/>
     <param name="lidar_frame" value="$(arg lidar_frame)"/>
     <param name="imu_topic" value="$(arg imu_topic)"/>
