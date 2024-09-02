@@ -1,3 +1,5 @@
+Public:
+  map: "/map/solchan.json"
 
 Cloud_Segmentation:
   lidar_settings:
@@ -28,10 +30,10 @@ Cloud_Segmentation:
       max_size: 2000
       min_tolerance: 0.7
       max_tolerance: 1.2
-      max_region_distance: 100
+      max_region_distance: 150
       number_region: 10
-      min_leaf_size: 0.2
-      max_leaf_size: 0.4
+      min_leaf_size: 0.2 # no use
+      max_leaf_size: 0.4 # no use
       threshIOU: 0.3
     L_shape_fitting:
       projection_range: 0.2

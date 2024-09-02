@@ -1,4 +1,7 @@
 #include "utils.hpp"
+#include "patchworkpp/patchworkpp.hpp"
+
+using ClusterPointT = pcl::PointXYZI;
 
 template <typename PointT>
 class CloudSegmentation {
@@ -6,6 +9,7 @@ public:
     CloudSegmentation() {};
 
     CloudSegmentation(ros::NodeHandle& nh) : nh_(nh) {
+        nh_.getParam("Public/map", map);
         nh_.getParam("Cloud_Segmentation/lidar_settings/V_SCAN", V_SCAN);
         nh_.getParam("Cloud_Segmentation/lidar_settings/H_SCAN", H_SCAN);
         nh_.getParam("Cloud_Segmentation/lidar_settings/ang_res_x", ang_res_x);
@@ -42,11 +46,16 @@ public:
         nh_.getParam("Cloud_Segmentation/crop/crop_intensity/intensity", crop_intensity);
         nh_.getParam("Cloud_Segmentation/crop/crop_hd_map/radius", crop_hd_map_radius);
 
+        global_path = map_reader(map.c_str());
+        delta_tolerance = (max_tolerance - min_tolerance) / number_region;
+        PatchworkppGroundSeg.reset(new PatchWorkpp<PointT>(&nh));
+
         // clear log
         clearLogFile(projection_time_log_path);
         clearLogFile(convert_time_log_path);
         clearLogFile(crop_time_log_path);
         clearLogFile(crophdmap_time_log_path);
+        clearLogFile(removalground_time_log_path);
         clearLogFile(undistortion_time_log_path);
         clearLogFile(downsampling_time_log_path);
         clearLogFile(clustering_time_log_path);
@@ -59,23 +68,25 @@ public:
     void projectPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double &time_taken);
     void convertPointCloudToImage(const pcl::PointCloud<PointT>& cloudIn, cv::Mat &imageOut, double &time_taken);
     void cropPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double &time_taken);
-    void cropPointCloudHDMap(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, 
-                    tf2_ros::Buffer &tf_buffer, const std::string target_frame, const std::string world_frame, 
-                    const std::vector<std::pair<float, float>> &global_path, double &time_taken);    
+    void cropHDMapPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, 
+                    tf2_ros::Buffer &tf_buffer, const std::string target_frame, const std::string world_frame, double &time_taken);
+    void removalGroundPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double &time_taken);
     void undistortPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double &time_taken);
-    void downsamplingPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<pcl::PointXYZ>& cloudOut, double &time_taken);
-    void adaptiveClustering(const pcl::PointCloud<pcl::PointXYZ>& cloudIn, std::vector<pcl::PointCloud<pcl::PointXYZ>>& outputClusters, double &time_taken);
-    void voxelClustering(const pcl::PointCloud<PointT>& cloudIn, std::vector<pcl::PointCloud<pcl::PointXYZ>>& outputClusters, double& time_taken);
-    void fittingLShape(const std::vector<pcl::PointCloud<pcl::PointXYZ>>& inputClusters, const std::string lidar_frame,
+    void downsamplingPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<ClusterPointT>& cloudOut, double &time_taken);
+    void adaptiveClustering(const pcl::PointCloud<ClusterPointT>& cloudIn, std::vector<pcl::PointCloud<ClusterPointT>>& outputClusters, double &time_taken);
+    void voxelClustering(const pcl::PointCloud<PointT>& cloudIn, std::vector<pcl::PointCloud<ClusterPointT>>& outputClusters, double& time_taken);
+    void fittingLShape(const std::vector<pcl::PointCloud<ClusterPointT>>& inputClusters, const std::string lidar_frame,
                         jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken);
 
     void adaptiveVoxelClustering(const pcl::PointCloud<PointT>& cloudIn, 
-                                                     std::vector<pcl::PointCloud<pcl::PointXYZ>>& outputClusters, 
+                                                     std::vector<pcl::PointCloud<ClusterPointT>>& outputClusters, 
                                                      double& time_taken);
     void averageTime();
 
 private:
     ros::NodeHandle nh_;
+    std::string map;
+    std::vector<std::pair<float, float>> global_path;
     int V_SCAN; // Vertical scan lines
     int H_SCAN; // Horizontal scan points per line
     float ang_res_x; // Angular resolution in x direction (degrees)
@@ -102,10 +113,11 @@ private:
     float max_tolerance; // Delta tolerance increment in clustering
     int max_region_distance; // Maximum regions for clustering
     int number_region; // Number of regions for adaptive clustering
-    float min_leaf_size;
-    float max_leaf_size;
+    float delta_tolerance; // Initialization is Public
+    float min_leaf_size; // no use
+    float max_leaf_size; // no use
     float threshIOU; // Intersection over Union threshold for clustering
-
+    
     // L-shape fitting parameters
     float projection_range; // Projection range for L-shape fitting
 
@@ -135,12 +147,16 @@ private:
     Eigen::Quaterniond pre_rotation = Eigen::Quaterniond(1, 0, 0, 0);
     ros::Time rotation_stamp;
 
+    // patchworkpp
+    boost::shared_ptr<PatchWorkpp<PointT>> PatchworkppGroundSeg;
+
     // average time check
     std::string package_path = ros::package::getPath("lidar_tracking") + "/time_log/cloud_segmentation/";
     std::string projection_time_log_path = package_path + "projection.txt";
     std::string convert_time_log_path = package_path + "convert.txt";
     std::string crop_time_log_path = package_path + "crop.txt";
     std::string crophdmap_time_log_path = package_path + "crophdmap.txt";
+    std::string removalground_time_log_path = package_path + "removalground.txt";
     std::string undistortion_time_log_path = package_path + "undistortion.txt";
     std::string downsampling_time_log_path = package_path + "downsampling.txt";
     std::string clustering_time_log_path = package_path + "clustering.txt";
@@ -411,9 +427,8 @@ void CloudSegmentation<PointT>::cropPointCloudHDMap(const pcl::PointCloud<PointT
 }
 */
 template<typename PointT> inline
-void CloudSegmentation<PointT>::cropPointCloudHDMap(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, 
-                    tf2_ros::Buffer &tf_buffer, const std::string target_frame, const std::string world_frame, 
-                    const std::vector<std::pair<float, float>> &global_path, double &time_taken)
+void CloudSegmentation<PointT>::cropHDMapPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, 
+                    tf2_ros::Buffer &tf_buffer, const std::string target_frame, const std::string world_frame, double &time_taken)
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -485,6 +500,26 @@ void CloudSegmentation<PointT>::cropPointCloudHDMap(const pcl::PointCloud<PointT
 }
 
 template<typename PointT> inline
+void CloudSegmentation<PointT>::removalGroundPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double& time_taken)
+{
+    auto start = std::chrono::steady_clock::now();
+
+    if (cloudIn.points.empty()) {
+        std::cerr << "Input cloud is empty! <- cropPointCloud" << std::endl;
+        return;
+    }
+
+    pcl::PointCloud<PointT> groundCloud;
+    PatchworkppGroundSeg->estimate_ground(cloudIn, groundCloud, cloudOut, time_taken);
+
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end - start;
+    time_taken = elapsed_seconds.count();
+    saveTimeToFile(removalground_time_log_path, time_taken);
+
+}
+
+template<typename PointT> inline
 void CloudSegmentation<PointT>::undistortPointCloud(const pcl::PointCloud<PointT>& cloudIn, 
                                                  pcl::PointCloud<PointT>& cloudOut, double &time_taken) 
 {
@@ -499,7 +534,6 @@ void CloudSegmentation<PointT>::undistortPointCloud(const pcl::PointCloud<PointT
         cloudOut = cloudIn;
         return;
     }
-
 
     // Convert the quaternion to SO3 for easier manipulation and calculate its inverse
     Sophus::SO3d final_so3(rotation);
@@ -539,7 +573,7 @@ void CloudSegmentation<PointT>::undistortPointCloud(const pcl::PointCloud<PointT
 }
 
 template<typename PointT> inline
-void CloudSegmentation<PointT>::downsamplingPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<pcl::PointXYZ>& cloudOut, double& time_taken) 
+void CloudSegmentation<PointT>::downsamplingPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<ClusterPointT>& cloudOut, double& time_taken) 
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -551,10 +585,10 @@ void CloudSegmentation<PointT>::downsamplingPointCloud(const pcl::PointCloud<Poi
     cloudOut.clear();
     cloudOut.reserve(cloudIn.size());
 
-    pcl::PointCloud<pcl::PointXYZ> tempCloud;
+    pcl::PointCloud<ClusterPointT> tempCloud;
     pcl::copyPointCloud(cloudIn, tempCloud); // copyPointCloud 사용하여 타입 변환 및 데이터 복사
-    pcl::VoxelGrid<pcl::PointXYZ> voxel_grid_filter;
-    voxel_grid_filter.setInputCloud(boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>(tempCloud)); // 입력 클라우드 설정
+    pcl::VoxelGrid<ClusterPointT> voxel_grid_filter;
+    voxel_grid_filter.setInputCloud(boost::make_shared<pcl::PointCloud<ClusterPointT>>(tempCloud)); // 입력 클라우드 설정
     voxel_grid_filter.setLeafSize(leaf_size_x, leaf_size_y, leaf_size_z); // Voxel 크기 설정
     voxel_grid_filter.filter(cloudOut); // 필터링 수행
     
@@ -564,10 +598,9 @@ void CloudSegmentation<PointT>::downsamplingPointCloud(const pcl::PointCloud<Poi
     saveTimeToFile(downsampling_time_log_path, time_taken);
 }
 
-/*
 template<typename PointT> inline
-void CloudSegmentation<PointT>::adaptiveClustering(const pcl::PointCloud<pcl::PointXYZ>& cloudIn, 
-                                                std::vector<pcl::PointCloud<pcl::PointXYZ>>& outputClusters, double& time_taken) 
+void CloudSegmentation<PointT>::adaptiveClustering(const pcl::PointCloud<ClusterPointT>& cloudIn, 
+                                                std::vector<pcl::PointCloud<ClusterPointT>>& outputClusters, double& time_taken) 
 {
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -580,13 +613,13 @@ void CloudSegmentation<PointT>::adaptiveClustering(const pcl::PointCloud<pcl::Po
     outputClusters.reserve(cloudIn.size());
 
     // Divide the point cloud into nested circular regions
-    std::vector<float> regions(max_region, max_region / number_region); // Example: Fill regions with a distance increment of 15m each
-    std::vector<std::vector<int>> indices_array(max_region);
+    std::vector<float> regions(max_region_distance, max_region_distance / number_region); // Example: Fill regions with a distance increment of 15m each
+    std::vector<std::vector<int>> indices_array(max_region_distance);
 
     for (int i = 0; i < cloudIn.size(); i++) {
         float distance = cloudIn.points[i].x * cloudIn.points[i].x + cloudIn.points[i].y * cloudIn.points[i].y;
         float range = 0.0;
-        for (int j = 0; j < max_region; j++) {
+        for (int j = 0; j < max_region_distance; j++) {
             if (distance > range * range && distance <= (range + regions[j]) * (range + regions[j]))
             {
                 indices_array[j].push_back(i);
@@ -596,29 +629,30 @@ void CloudSegmentation<PointT>::adaptiveClustering(const pcl::PointCloud<pcl::Po
         }
     }
 
+
     // Euclidean clustering for each region
-    for (int i = 0; i < max_region; i++) {
+    for (int i = 0; i < max_region_distance; i++) {
         if (indices_array[i].empty()) continue;
 
-        pcl::PointCloud<pcl::PointXYZ> cloudSegment;
+        pcl::PointCloud<ClusterPointT> cloudSegment;
         for (int index : indices_array[i]) {
             cloudSegment.points.push_back(cloudIn.points[index]);
         }
 
-        pcl::search::KdTree<pcl::PointXYZ> tree;
-        tree.setInputCloud(boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>(cloudSegment));
+        pcl::search::KdTree<ClusterPointT> tree;
+        tree.setInputCloud(boost::make_shared<pcl::PointCloud<ClusterPointT>>(cloudSegment));
 
         std::vector<pcl::PointIndices> cluster_indices;
-        pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-        ec.setClusterTolerance(start_tolerance + delta_tolerance * i); // Increment tolerance for farther regions
+        pcl::EuclideanClusterExtraction<ClusterPointT> ec;
+        ec.setClusterTolerance(min_tolerance + delta_tolerance * i); // Increment tolerance for farther regions
         ec.setMinClusterSize(adaptive_min_size);
         ec.setMaxClusterSize(adaptive_max_size);
-        ec.setSearchMethod(boost::make_shared<pcl::search::KdTree<pcl::PointXYZ>>(tree));
-        ec.setInputCloud(boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>(cloudSegment));
+        ec.setSearchMethod(boost::make_shared<pcl::search::KdTree<ClusterPointT>>(tree));
+        ec.setInputCloud(boost::make_shared<pcl::PointCloud<ClusterPointT>>(cloudSegment));
         ec.extract(cluster_indices);
 
         for (auto& indices : cluster_indices) {
-            pcl::PointCloud<pcl::PointXYZ> cluster;
+            pcl::PointCloud<ClusterPointT> cluster;
             for (int idx : indices.indices) {
                 cluster.points.push_back(cloudSegment.points[idx]);
             }
@@ -627,7 +661,7 @@ void CloudSegmentation<PointT>::adaptiveClustering(const pcl::PointCloud<pcl::Po
             cluster.is_dense = true;
             
             // Size filtering
-            pcl::PointXYZ minPt, maxPt;
+            ClusterPointT minPt, maxPt;
             pcl::getMinMax3D(cluster, minPt, maxPt);
             double clusterSizeX = maxPt.x - minPt.x;
             double clusterSizeY = maxPt.y - minPt.y;
@@ -644,12 +678,13 @@ void CloudSegmentation<PointT>::adaptiveClustering(const pcl::PointCloud<pcl::Po
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
     time_taken = elapsed.count();
+    saveTimeToFile(clustering_time_log_path, time_taken);
 }
-*/
 
+/*
 template<typename PointT> inline
 void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<PointT>& cloudIn, 
-                                                     std::vector<pcl::PointCloud<pcl::PointXYZ>>& outputClusters, 
+                                                     std::vector<pcl::PointCloud<ClusterPointT>>& outputClusters, 
                                                      double& time_taken) 
 {
     auto start = std::chrono::high_resolution_clock::now();
@@ -662,8 +697,8 @@ void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<Po
     outputClusters.clear();
     outputClusters.reserve(cloudIn.size());
 
-    // Convert the input cloud to pcl::PointXYZ type
-    pcl::PointCloud<pcl::PointXYZ> xyzCloud;
+    // Convert the input cloud to ClusterPointT type
+    pcl::PointCloud<ClusterPointT> xyzCloud;
     pcl::copyPointCloud(cloudIn, xyzCloud);
 
     // 구간별 거리 단계 설정
@@ -694,40 +729,40 @@ void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<Po
     for (int i = 0; i <= number_region; i++) {
         if (indices_array[i].empty()) continue;
 
-        pcl::PointCloud<pcl::PointXYZ> cloudSegment;
+        pcl::PointCloud<ClusterPointT> cloudSegment;
         for (int index : indices_array[i]) {
             cloudSegment.points.push_back(xyzCloud.points[index]);
         }
 
         if (i != number_region) {
             // 100m 이전의 구간 처리 (복셀화 적용)
-            pcl::VoxelGrid<pcl::PointXYZ> voxel_grid_filter;
+            pcl::VoxelGrid<ClusterPointT> voxel_grid_filter;
             float leaf_size = max_leaf_size - (i * (max_leaf_size - min_leaf_size) / (number_region - 1)); // 구간별 leaf_size 계산
             voxel_grid_filter.setLeafSize(leaf_size, leaf_size, leaf_size);
-            voxel_grid_filter.setInputCloud(boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>(cloudSegment));
+            voxel_grid_filter.setInputCloud(boost::make_shared<pcl::PointCloud<ClusterPointT>>(cloudSegment));
 
-            pcl::PointCloud<pcl::PointXYZ> downsampledCloud;
+            pcl::PointCloud<ClusterPointT> downsampledCloud;
             voxel_grid_filter.filter(downsampledCloud);
             cloudSegment = downsampledCloud; // 다운샘플링된 클라우드로 업데이트
         }
 
         // Perform Euclidean clustering
-        pcl::search::KdTree<pcl::PointXYZ> tree;
-        tree.setInputCloud(boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>(cloudSegment));
+        pcl::search::KdTree<ClusterPointT> tree;
+        tree.setInputCloud(boost::make_shared<pcl::PointCloud<ClusterPointT>>(cloudSegment));
 
         std::vector<pcl::PointIndices> cluster_indices;
-        pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+        pcl::EuclideanClusterExtraction<ClusterPointT> ec;
         float tolerance = (i == number_region) ? max_tolerance : min_tolerance + (i * (max_tolerance - min_tolerance) / (number_region - 1)); // 구간별 tolerance 계산
         ec.setClusterTolerance(tolerance);
         ec.setMinClusterSize(adaptive_min_size);  // 원래 코드에 있던 adaptive_min_size 사용
         ec.setMaxClusterSize(adaptive_max_size);  // 원래 코드에 있던 adaptive_max_size 사용
-        ec.setSearchMethod(boost::make_shared<pcl::search::KdTree<pcl::PointXYZ>>(tree));
-        ec.setInputCloud(boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>(cloudSegment));
+        ec.setSearchMethod(boost::make_shared<pcl::search::KdTree<ClusterPointT>>(tree));
+        ec.setInputCloud(boost::make_shared<pcl::PointCloud<ClusterPointT>>(cloudSegment));
         ec.extract(cluster_indices);
 
         // Cluster size filtering and output storage
         for (auto& indices : cluster_indices) {
-            pcl::PointCloud<pcl::PointXYZ> cluster;
+            pcl::PointCloud<ClusterPointT> cluster;
             for (int idx : indices.indices) {
                 cluster.points.push_back(cloudSegment.points[idx]);
             }
@@ -735,7 +770,7 @@ void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<Po
             cluster.height = 1;
             cluster.is_dense = true;
 
-            pcl::PointXYZ minPt, maxPt;
+            ClusterPointT minPt, maxPt;
             pcl::getMinMax3D(cluster, minPt, maxPt);
             double clusterSizeX = maxPt.x - minPt.x;
             double clusterSizeY = maxPt.y - minPt.y;
@@ -755,9 +790,10 @@ void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<Po
     time_taken = elapsed.count();
     saveTimeToFile(clustering_time_log_path, time_taken);
 }
+*/
 
 template<typename PointT> inline
-void CloudSegmentation<PointT>::fittingLShape(const std::vector<pcl::PointCloud<pcl::PointXYZ>>& inputClusters, 
+void CloudSegmentation<PointT>::fittingLShape(const std::vector<pcl::PointCloud<ClusterPointT>>& inputClusters, 
                                            const std::string lidar_frame, jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken) 
 {
     auto start = std::chrono::steady_clock::now();
@@ -769,8 +805,8 @@ void CloudSegmentation<PointT>::fittingLShape(const std::vector<pcl::PointCloud<
 
     output_bbox_array.boxes.clear();
 
-    for (const pcl::PointCloud<pcl::PointXYZ>& cluster : inputClusters) {
-        pcl::PointXYZ minPoint, maxPoint;
+    for (const pcl::PointCloud<ClusterPointT>& cluster : inputClusters) {
+        ClusterPointT minPoint, maxPoint;
         pcl::getMinMax3D(cluster, minPoint, maxPoint);
 
         // rectangle
@@ -840,7 +876,7 @@ void CloudSegmentation<PointT>::averageTime()
     file << "projection : " << calculateAverageTime(projection_time_log_path) << "\n";
     file << "converstion : " << calculateAverageTime(convert_time_log_path) << "\n";
     file << "crop : " << calculateAverageTime(crop_time_log_path) << "\n";
-    file << "ground removal : " << calculateAverageTime(crop_time_log_path) << "\n";
+    file << "ground removal : " << calculateAverageTime(removalground_time_log_path) << "\n";
     file << "undistortion : " << calculateAverageTime(undistortion_time_log_path) << "\n";
     file << "downsampling : " << calculateAverageTime(downsampling_time_log_path) << "\n";
     file << "clustering : " << calculateAverageTime(clustering_time_log_path) << "\n";

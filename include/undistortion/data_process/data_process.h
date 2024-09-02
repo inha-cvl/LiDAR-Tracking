@@ -11,8 +11,10 @@
 #include "sophus/se3.hpp"
 #include <cmath>
 #include <time.h>
+#include "point_type/hesai_point.h"
+#include "point_type/os_point.h"
 
-#include "params.h"
+using PointType = PointXYZIT;
 
 typedef pcl::PointCloud<PointType> PointT;
 

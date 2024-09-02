@@ -29,8 +29,6 @@
 using namespace std;
 using namespace pcl;
 
-extern std::string frameID;
-
 class DepthCluster {
 public:
     /**

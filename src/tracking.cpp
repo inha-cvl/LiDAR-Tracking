@@ -11,7 +11,7 @@ boost::shared_ptr<Tracking> Tracking_;  // Tracking 클래스의 객체를 boost
 double t9, t10, t11, t12, t13, total;
 std::string fixed_frame;
 
-std::vector<std::pair<float, float>> global_path;
+// std::vector<std::pair<float, float>> global_path;
 tf2_ros::Buffer tf_buffer;
 
 jsk_recognition_msgs::BoundingBoxArray cluster_bbox_array, deep_bbox_array, integration_bbox_array, filtered_bbox_array, track_bbox_array, transformed_bbox_array, corrected_bbox_array, output_bbox_array;
@@ -27,7 +27,7 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
     cluster_bbox_array = *bba_msg;
 
     Tracking_->integrationBbox(cluster_bbox_array, deep_bbox_array, integration_bbox_array, t9);
-    Tracking_->cropBboxHDMap(integration_bbox_array, filtered_bbox_array, bba_msg->header.stamp, tf_buffer, target_frame, world_frame, global_path, t10);
+    Tracking_->cropHDMapBbox(integration_bbox_array, filtered_bbox_array, bba_msg->header.stamp, tf_buffer, target_frame, world_frame, t10);
     Tracking_->tracking(tracker, filtered_bbox_array, track_bbox_array, track_text_array, bba_msg->header.stamp, t11);
     
     if (checkTransform(tf_buffer, lidar_frame, target_frame)) {
@@ -65,9 +65,6 @@ int main(int argc, char** argv)
     ros::NodeHandle nh;
     ros::NodeHandle pnh("~");
     tf2_ros::TransformListener tf_listener(tf_buffer);
-    global_path = map_reader();
-
-    //std::atexit(Tracking_->);
 
     pnh.param<std::string>("lidar_frame", lidar_frame, "hesai_lidar");
     pnh.param<std::string>("target_frame", target_frame, "ego_car");

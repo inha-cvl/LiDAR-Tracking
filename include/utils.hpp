@@ -50,9 +50,10 @@ sensor_msgs::ImagePtr image2msg(const cv::Mat& image, const ros::Time &stamp, co
     return cv_image.toImageMsg();
 }
 
-sensor_msgs::PointCloud2 cluster2msg(const std::vector<pcl::PointCloud<pcl::PointXYZ>>& cluster_array, const ros::Time& stamp, const std::string& frame_id) 
+template<typename PointT>
+sensor_msgs::PointCloud2 cluster2msg(const std::vector<pcl::PointCloud<PointT>>& cluster_array, const ros::Time& stamp, const std::string& frame_id) 
 {
-    pcl::PointCloud<pcl::PointXYZ> combined_cloud;
+    pcl::PointCloud<PointT> combined_cloud;
 
     for (const auto& cluster : cluster_array) {
         combined_cloud += cluster;
@@ -199,12 +200,13 @@ double getBBoxOverlap(jsk_recognition_msgs::BoundingBox bbox1, jsk_recognition_m
     return overlap;
 }
 
-std::vector<cv::Point2f> pcl2Point2f(const pcl::PointCloud<pcl::PointXYZ>& cloud, double projection_range)
+template<typename PointT>
+std::vector<cv::Point2f> pcl2Point2f(const pcl::PointCloud<PointT>& cloud, double projection_range)
 {
     std::vector<cv::Point2f> points;
     points.reserve(cloud.size());
 
-    pcl::PointXYZ minPoint, maxPoint;
+    PointT minPoint, maxPoint;
     pcl::getMinMax3D(cloud, minPoint, maxPoint);
     double center_z = (minPoint.z + maxPoint.z) / 2;
     
@@ -251,7 +253,7 @@ Eigen::Quaterniond calculateRotationBetweenStamps(const std::deque<sensor_msgs::
     return rotation_increment;
 }
 
-std::vector<std::pair<float, float>> map_reader()
+std::vector<std::pair<float, float>> map_reader(std::string map_path)
 {
     Json::Value root;      
     Json::Reader reader;
@@ -260,7 +262,7 @@ std::vector<std::pair<float, float>> map_reader()
 
     // ROS 패키지 경로 얻기
     std::string package_path = ros::package::getPath("lidar_tracking");
-    std::string json_file_path = package_path + "/map/solchan.json";  // 상대 경로 사용
+    std::string json_file_path = package_path + map_path;  // 상대 경로 사용
 
     std::ifstream t(json_file_path);
     if (!t.is_open()) {

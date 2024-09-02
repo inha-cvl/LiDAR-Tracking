@@ -1,17 +1,15 @@
 #include <iostream>
-#include "patchworkpp/patchworkpp.hpp"
 #include "cloud_segmentation/cloud_segmentation.hpp"
 
 using PointType = PointXYZIT;
-using ClusterPointType = pcl::PointXYZ;
 
 boost::shared_ptr<PatchWorkpp<PointType>> PatchworkppGroundSeg; // PatchWorkpp
 boost::shared_ptr<CloudSegmentation<PointType>> CloudSegmentation_;
 
 pcl::PointCloud<PointType> fullCloud, projectionCloud, cropCloud, groundCloud, nonGroundCloud, undistortionCloud;
-pcl::PointCloud<pcl::PointXYZ> downsamplingCloud;
+pcl::PointCloud<ClusterPointT> downsamplingCloud;
 cv::Mat projectionImage;
-vector<pcl::PointCloud<pcl::PointXYZ>> cluster_array;
+vector<pcl::PointCloud<ClusterPointT>> cluster_array;
 jsk_recognition_msgs::BoundingBoxArray cluster_bbox_array;
 
 ros::Publisher pub_projection_cloud;
@@ -30,8 +28,6 @@ ros::Time input_stamp;
 double t1,t2,t3,t4,t5,t6,t7,t8;
 
 std::string lidar_topic, imu_topic, lidar_frame, target_frame, world_frame;
-
-std::vector<std::pair<float, float>> global_path;
 
 void callbackIMU(const sensor_msgs::Imu::ConstPtr &msg_in) 
 {
@@ -53,10 +49,11 @@ void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
     CloudSegmentation_->cropPointCloud(fullCloud, cropCloud, t3);
     // pub_crop_cloud.publish(cloud2msg(cropCloud, input_stamp, lidar_frame));
 
-    // CloudSegmentation->cropPointCloudHDMap(cropCloud, groundCloud, tf_buffer, target_frame, world_frame, global_path, t4);
+    // CloudSegmentation->cropHDMapPointCloud(cropCloud, groundCloud, tf_buffer, target_frame, world_frame, t4);
     // pub_ground.publish(cloud2msg(groundCloud, input_stamp, lidar_frame));
 
-    PatchworkppGroundSeg->estimate_ground(cropCloud, groundCloud, nonGroundCloud, t4);
+    CloudSegmentation_->removalGroundPointCloud(cropCloud, nonGroundCloud, t4);
+    //PatchworkppGroundSeg->estimate_ground(cropCloud, groundCloud, nonGroundCloud, t4);
     // pub_non_ground.publish(cloud2msg(nonGroundCloud, input_stamp, lidar_frame));
 
     CloudSegmentation_->undistortPointCloud(nonGroundCloud, undistortionCloud, t5);
@@ -65,7 +62,7 @@ void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
     CloudSegmentation_->downsamplingPointCloud(undistortionCloud, downsamplingCloud, t6);
     pub_downsampling_cloud.publish(cloud2msg(downsamplingCloud, input_stamp, lidar_frame));
 
-    CloudSegmentation_->adaptiveVoxelClustering(undistortionCloud, cluster_array, t7);
+    CloudSegmentation_->adaptiveClustering(downsamplingCloud, cluster_array, t7);
     // //CloudSegmentation_->voxelClustering(undistortionCloud, cluster_array, t7);
     // CloudSegmentation_->adaptiveClustering(downsamplingCloud, cluster_array, t7);
     // pub_cluster_array.publish(cluster2msg(cluster_array, input_stamp, lidar_frame));
@@ -88,7 +85,6 @@ int main(int argc, char**argv) {
     ros::NodeHandle nh;
     ros::NodeHandle pnh("~");
     tf2_ros::TransformListener tf_listener(tf_buffer);
-    global_path = map_reader();
 
     pnh.param<string>("lidar_topic", lidar_topic, "/lidar_points");
     pnh.param<string>("imu_topic", imu_topic, "/ublox/imu_meas");

@@ -6,8 +6,11 @@ public:
 
     Tracking(ros::NodeHandle& nh) : nh_(nh) {
         // ROS Parameters
+        nh_.getParam("Public/map", map);
         nh_.getParam("Tracking/integration/threshIOU", threshIOU);
         nh_.getParam("Tracking/crop_hd_map/radius", crop_hd_map_radius);
+
+        global_path = map_reader(map.c_str());
 
         clearLogFile(integration_time_log_path);
         clearLogFile(crophdmap_time_log_path);
@@ -21,14 +24,14 @@ public:
                          const jsk_recognition_msgs::BoundingBoxArray &deep_bbox_array,
                          jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken);
     
-    void cropBboxHDMap(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, 
+    void cropHDMapBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, 
                        jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, 
                        const ros::Time &input_stamp, tf2_ros::Buffer &tf_buffer, const std::string target_frame, 
-                       const std::string world_frame, const std::vector<std::pair<float, float>> &global_path, double &time_taken);
+                       const std::string world_frame, double &time_taken);
     
     void tracking(Track &tracker, const jsk_recognition_msgs::BoundingBoxArray &bbox_array, 
                   jsk_recognition_msgs::BoundingBoxArray &track_bbox_array, visualization_msgs::MarkerArray &track_text_array,
-                  const ros::Time &stamp, double &time_taken);
+                  const ros::Time &input_stamp, double &time_taken);
 
     void transformBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, const std::string &frame_id, 
                        const std::string &target_frame, tf2_ros::Buffer &tf_buffer,
@@ -42,6 +45,8 @@ public:
 
 private:
     ros::NodeHandle nh_;
+    std::string map;
+    std::vector<std::pair<float, float>> global_path; // Initialization is Public
     float threshIOU;    // IOU threshold for bounding box integration
     double crop_hd_map_radius; // Minimum distance threshold for HD map cropping
 
@@ -83,10 +88,10 @@ void Tracking::integrationBbox(const jsk_recognition_msgs::BoundingBoxArray &clu
     saveTimeToFile(integration_time_log_path, time_taken);
 }
 
-void Tracking::cropBboxHDMap(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, 
+void Tracking::cropHDMapBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, 
                              jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, 
                              const ros::Time &input_stamp, tf2_ros::Buffer &tf_buffer, const std::string target_frame, 
-                             const std::string world_frame, const std::vector<std::pair<float, float>> &global_path, double& time_taken) 
+                             const std::string world_frame, double& time_taken) 
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -98,7 +103,7 @@ void Tracking::cropBboxHDMap(const jsk_recognition_msgs::BoundingBoxArray &input
     } catch (tf2::TransformException &ex) {
         output_bbox_array = input_bbox_array;
         return;
-    }
+    }  
 
     for (const auto& box : input_bbox_array.boxes) {
         geometry_msgs::Point transformed_point;
@@ -126,7 +131,7 @@ void Tracking::cropBboxHDMap(const jsk_recognition_msgs::BoundingBoxArray &input
 
 void Tracking::tracking(Track &tracker, const jsk_recognition_msgs::BoundingBoxArray &bbox_array, 
                         jsk_recognition_msgs::BoundingBoxArray &track_bbox_array, visualization_msgs::MarkerArray &track_text_array,
-                        const ros::Time &stamp, double& time_taken)
+                        const ros::Time &input_stamp, double& time_taken)
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -134,7 +139,7 @@ void Tracking::tracking(Track &tracker, const jsk_recognition_msgs::BoundingBoxA
     track_text_array.markers.clear();
     tracker.predictNewLocationOfTracks();
     tracker.assignDetectionsTracks(bbox_array);
-    tracker.assignedTracksUpdate(bbox_array, stamp);
+    tracker.assignedTracksUpdate(bbox_array, input_stamp);
     tracker.unassignedTracksUpdate();
     tracker.deleteLostTracks();
     tracker.createNewTracks(bbox_array);

@@ -25,7 +25,7 @@ Panels:
   - Class: rviz/Time
     Name: Time
     SyncMode: 0
-    SyncSource: ""
+    SyncSource: DownsampledCloud
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -128,7 +128,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: FlatColor
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Min Color: 0; 0; 0
@@ -143,7 +143,7 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -231,18 +231,18 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
+        Max Value: -0.2866436541080475
+        Min Value: -1.8176766633987427
         Value: true
       Axis: Z
       Channel Name: intensity
       Class: rviz/PointCloud2
       Color: 92; 53; 102
-      Color Transformer: FlatColor
+      Color Transformer: AxisColor
       Decay Time: 0
-      Enabled: false
+      Enabled: true
       Invert Rainbow: false
-      Max Color: 164; 0; 0
+      Max Color: 19; 99; 223
       Min Color: 0; 0; 0
       Name: DownsampledCloud
       Position Transformer: XYZ
@@ -255,18 +255,18 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: false
+      Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
+        Max Value: -0.29863473773002625
+        Min Value: -1.7169705629348755
         Value: true
       Axis: Z
       Channel Name: intensity
       Class: rviz/PointCloud2
       Color: 243; 243; 0
-      Color Transformer: FlatColor
+      Color Transformer: AxisColor
       Decay Time: 0
       Enabled: false
       Invert Rainbow: false
@@ -310,12 +310,12 @@ Visualization Manager:
       only edge: false
       show coords: false
     - Class: jsk_rviz_plugin/BoundingBoxArray
-      Enabled: true
+      Enabled: false
       Name: DeepBox
       Queue Size: 10
       Topic: /deep_box
       Unreliable: false
-      Value: true
+      Value: false
       alpha: 0.5
       color: 25; 255; 0
       coloring: Flat color
@@ -323,12 +323,12 @@ Visualization Manager:
       only edge: false
       show coords: false
     - Class: jsk_rviz_plugin/BoundingBoxArray
-      Enabled: false
+      Enabled: true
       Name: TrackBox
       Queue Size: 10
       Topic: /mobinha/perception/lidar/track_box
       Unreliable: false
-      Value: false
+      Value: true
       alpha: 0.8999999761581421
       color: 239; 41; 41
       coloring: Flat color
@@ -379,7 +379,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 91.28595733642578
+      Distance: 35.2765998840332
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -395,9 +395,9 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.5247970819473267
+      Pitch: 0.624796986579895
       Target Frame: <Fixed Frame>
-      Yaw: 3.136782646179199
+      Yaw: 3.141784429550171
     Saved: ~
 Window Geometry:
   Displays:
