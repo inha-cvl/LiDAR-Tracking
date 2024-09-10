@@ -47,7 +47,23 @@ public:
         nh_.getParam("Cloud_Segmentation/crop/crop_hd_map/radius", crop_hd_map_radius);
 
         global_path = map_reader(map.c_str());
+
+        // lidar
+        dt_l_c_ = 0.05;
+        cur_stamp = ros::Time(0);
+        pre_stamp = ros::Time(0);
+
+        // imu
+        imu_cache.setCacheSize(1000);
+        last_timestamp_imu = -1;
+        Eigen::Quaterniond q(1, 0, 0, 0);
+        Eigen::Vector3d t(0, 0, 0);
+        T_i_l = Sophus::SE3d(q, t);
+
+        // clustering
         delta_tolerance = (max_tolerance - min_tolerance) / number_region;
+
+        // ground removal
         PatchworkppGroundSeg.reset(new PatchWorkpp<PointT>(&nh));
 
         // clear log
@@ -135,17 +151,17 @@ private:
     float crop_hd_map_radius; // Radius for HD map-based cropping
 
     // lidar
-    ros::Time cur_stamp = ros::Time(0);
-    ros::Time pre_stamp = ros::Time(0);
-    double interval = 0.05;
+    ros::Time cur_stamp;
+    ros::Time pre_stamp;
+    double dt_l_c_;
 
     // imu
-    double last_timestamp_imu = -1;
+    GyrInt gyr_int_;
+    double last_timestamp_imu;
     std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer;
-    const size_t MAX_IMU_BUFFER_SIZE = 1000;
-    Eigen::Quaterniond rotation = Eigen::Quaterniond(1, 0, 0, 0);
-    Eigen::Quaterniond pre_rotation = Eigen::Quaterniond(1, 0, 0, 0);
-    ros::Time rotation_stamp;
+    message_filters::Cache<sensor_msgs::Imu> imu_cache;
+    sensor_msgs::ImuConstPtr last_imu_;
+    Sophus::SE3d T_i_l;
 
     // patchworkpp
     boost::shared_ptr<PatchWorkpp<PointT>> PatchworkppGroundSeg;
@@ -171,32 +187,64 @@ void CloudSegmentation<PointT>::msgToPointCloud(const sensor_msgs::PointCloud2::
     pcl::fromROSMsg(*cloud_msg, cloud);
     pre_stamp = cur_stamp;
     cur_stamp = cloud_msg->header.stamp;
-    interval = cur_stamp.toSec() - pre_stamp.toSec();
+    dt_l_c_ = cur_stamp.toSec() - pre_stamp.toSec();
 }
 
 template<typename PointT> inline
 void CloudSegmentation<PointT>::imuUpdate(const sensor_msgs::Imu::ConstPtr &imu_msg)
+{   
+    imu_cache.add(imu_msg);
+}
+
+/*
+// TODO: Synchronization
+template<typename PointT> inline
+void CloudSegmentation<PointT>::imuUpdate(const sensor_msgs::Imu::ConstPtr &imu_msg)
 {
     double timestamp = imu_msg->header.stamp.toSec();
-    // ROS_DEBUG("get imu at time: %.6f", timestamp);
 
+    // IMU 데이터의 타임스탬프가 이전 데이터보다 작은 경우(루프백 현상) 버퍼를 초기화하고 통합기를 리셋
     if (timestamp < last_timestamp_imu) {
-        ROS_ERROR("imu loop back, clear buffer");
-        imu_buffer.clear();
+        ROS_ERROR("IMU loop back detected, clearing buffer");
+        imu_buffer.clear();  // 버퍼 초기화
+        gyr_int_.Reset(timestamp, imu_msg);  // 통합기 리셋
     }
-
-    last_timestamp_imu = timestamp;
+    last_timestamp_imu = timestamp;  // 최신 IMU 타임스탬프 업데이트
 
     imu_buffer.push_back(imu_msg);
 
-    if (cur_stamp != rotation_stamp) {
-        rotation = calculateRotationBetweenStamps(imu_buffer, pre_stamp, cur_stamp);
+    // if (imu_buffer.size() > MAX_IMU_BUFFER_SIZE) {
+    //     imu_buffer.pop_front();  // 가장 오래된 IMU 데이터를 제거
+    // }
+
+    // imu_buffer가 비어있지 않은지 확인 후 마지막 IMU 데이터 업데이트
+    if (!imu_buffer.empty()) {
+        last_imu_ = imu_buffer.back();  // 마지막 IMU 데이터로 업데이트
+    } else {
+        ROS_WARN("imu_buffer is empty, cannot update last_imu_");
     }
 
-    if (imu_buffer.size() > MAX_IMU_BUFFER_SIZE) { imu_buffer.pop_front(); }
+    // Lidar 데이터 타임스탬프와 IMU 데이터의 타임스탬프가 일치하지 않으면 IMU 데이터를 통합
+    if (cur_stamp != rotation_stamp) {
+        // last_imu_가 유효한지 체크
+        if (last_imu_) {
+            gyr_int_.Reset(pre_stamp.toSec(), last_imu_);  // Reset with the last IMU data
+        } else {
+            ROS_WARN("last_imu_ is null, skipping integration reset");
+        }
+        // 버퍼에 있는 모든 IMU 데이터를 사용해 회전값 통합
+        for (const auto &imu : imu_buffer) {
+            gyr_int_.Integrate(imu);  // IMU 데이터를 통합하여 회전값 계산
+        }
+
+        imu_buffer.clear();
+    }
     
+    // 현재 Lidar 타임스탬프를 rotation_stamp로 업데이트하여 다음 통합 시점 결정
     rotation_stamp = cur_stamp;
 }
+*/
+
 
 template<typename PointT> inline
 void CloudSegmentation<PointT>::projectPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double& time_taken) 
@@ -521,7 +569,84 @@ void CloudSegmentation<PointT>::removalGroundPointCloud(const pcl::PointCloud<Po
 
 template<typename PointT> inline
 void CloudSegmentation<PointT>::undistortPointCloud(const pcl::PointCloud<PointT>& cloudIn, 
-                                                 pcl::PointCloud<PointT>& cloudOut, double &time_taken) 
+                                                    pcl::PointCloud<PointT>& cloudOut, double &time_taken)
+{
+    auto start_time = std::chrono::steady_clock::now();
+
+    if (cloudIn.points.empty()) {
+        std::cerr << "Input cloud is empty! <- undistortPointCloud" << std::endl;
+        cloudOut = cloudIn;
+        return;
+    }
+
+    auto imu_data = imu_cache.getInterval(pre_stamp, cur_stamp);
+    if (imu_data.empty()) {
+        cloudOut = cloudIn;
+        std::cerr << "Input imu is empty! <- undistortPointCloud" << std::endl;
+        return;
+    }
+
+    const sensor_msgs::Imu::ConstPtr& first_imu = imu_data.front();
+    double timestamp = first_imu->header.stamp.toSec();
+    
+    if (timestamp < last_timestamp_imu) {
+        ROS_ERROR("IMU loop back detected, resetting integrator");
+        gyr_int_.Reset(timestamp, first_imu);
+    }
+    last_timestamp_imu = timestamp;  // 최신 IMU 타임스탬프 업데이트
+
+    // 타임스탬프 범위 내의 IMU 데이터를 통합
+    gyr_int_.Reset(pre_stamp.toSec(), first_imu);  // Reset integrator with the first IMU in the time range
+    for (const auto& imu : imu_data) {
+        gyr_int_.Integrate(imu);  // 각 IMU 데이터를 통합하여 회전값 계산
+    }
+
+    // IMU와 LiDAR 간의 변환 행렬 T_i_l을 이용해 보정할 최종 회전 및 변환 행렬 생성
+    Sophus::SE3d T_l_c(gyr_int_.GetRot(), Eigen::Vector3d::Zero());  // 현재 IMU 회전만 고려
+    Sophus::SE3d T_l_be = T_i_l.inverse() * T_l_c * T_i_l;  // LiDAR 좌표계에서 IMU 좌표계로 변환 적용
+
+    // 회전과 변환 정보 추출
+    const Eigen::Vector3d &tbe = T_l_be.translation();
+    Eigen::Vector3d rso3_be = T_l_be.so3().log();
+
+    // 각 포인트에 대해 회전 및 변환 적용
+    cloudOut.clear();
+    cloudOut.reserve(cloudIn.size());
+
+    for (const auto &pt : cloudIn.points) {
+        // 포인트의 시간 차이 계산
+        double dt_bi = pt.timestamp - pre_stamp.toSec();
+        if (dt_bi == 0) continue;
+
+        double ratio_bi = dt_bi / dt_l_c_;
+        double ratio_ie = 1 - ratio_bi;
+
+        // IMU 회전을 LiDAR 프레임으로 보정
+        Eigen::Vector3d rso3_ie = ratio_ie * rso3_be;
+        Sophus::SO3d Rie = Sophus::SO3d::exp(rso3_ie);
+
+        // 보정된 회전과 변환 적용: P_compensate = R_ei * Pi + t_ei
+        Eigen::Vector3d tie = ratio_ie * tbe;
+        Eigen::Vector3d pt_vec(pt.x, pt.y, pt.z);
+        Eigen::Vector3d pt_compensated = Rie.inverse() * (pt_vec - tie);
+
+        // 보정된 포인트 업데이트
+        PointT new_point = pt;
+        new_point.x = pt_compensated.x();
+        new_point.y = pt_compensated.y();
+        new_point.z = pt_compensated.z();
+        cloudOut.points.push_back(new_point);
+    }
+
+    auto end_time = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end_time - start_time;
+    time_taken = elapsed_seconds.count();
+}
+
+/*
+template<typename PointT> inline
+void CloudSegmentation<PointT>::undistortPointCloud(const pcl::PointCloud<PointT>& cloudIn, 
+                                                    pcl::PointCloud<PointT>& cloudOut, double &time_taken)
 {
     auto start_time = std::chrono::steady_clock::now();
 
@@ -530,47 +655,64 @@ void CloudSegmentation<PointT>::undistortPointCloud(const pcl::PointCloud<PointT
         return;
     }
 
-    if (rotation.coeffs().isApprox(pre_rotation.coeffs())) {
+    // 회전 값이 존재하지 않으면 바로 리턴
+    if (gyr_int_.GetRot().matrix().isApprox(Eigen::Matrix3d::Identity())) {
+        std::cerr << "Input rotation is empty! <- undistortPointCloud" << std::endl;
         cloudOut = cloudIn;
         return;
     }
 
-    // Convert the quaternion to SO3 for easier manipulation and calculate its inverse
-    Sophus::SO3d final_so3(rotation);
-    Sophus::SO3d inverse_so3 = final_so3.inverse();
+    // IMU와 LiDAR 간의 변환 행렬 T_i_l을 이용해 보정할 최종 회전 및 변환 행렬 생성
+    Sophus::SE3d T_l_c(gyr_int_.GetRot(), Eigen::Vector3d::Zero());  // 현재 IMU 회전만 고려
+    Sophus::SE3d T_l_be = T_i_l.inverse() * T_l_c * T_i_l;  // LiDAR 좌표계에서 IMU 좌표계로 변환 적용
 
-    // Process each point in the cloud
+    // 회전과 변환 정보 추출
+    const Eigen::Vector3d &tbe = T_l_be.translation();
+    Eigen::Vector3d rso3_be = T_l_be.so3().log();
+
+    double diff_x = std::abs(rso3_be.x() - prev_rso3_be.x());
+    double diff_y = std::abs(rso3_be.y() - prev_rso3_be.y());
+    // std::cout << "rso3_be (rotation vector): (" << rso3_be.x() << ", " << rso3_be.y() << ", " << rso3_be.z() << ")\n";
+    if (diff_x > 0.001 || diff_y > 0.001) {
+        rso3_be = (prev_rso3_be + rso3_be) / 2.0;
+    }
+
+    // 각 포인트에 대해 회전 및 변환 적용
     cloudOut.clear();
     cloudOut.reserve(cloudIn.size());
 
-    for (size_t i = 0; i < cloudIn.points.size(); ++i) {
-        const auto &pt = cloudIn.points[i];
+    for (const auto &pt : cloudIn.points) {
+        // 포인트의 시간 차이 계산
+        double dt_bi = pt.timestamp - pre_stamp.toSec();
+        if (dt_bi == 0) continue;
 
-        double dt = pt.timestamp - cur_stamp.toSec();
-        if (dt == 0) continue;
-        double ratio = dt / interval;
-        Sophus::SO3d scaled_so3 = Sophus::SO3d::exp(ratio * inverse_so3.log());
+        double ratio_bi = dt_bi / dt_l_c_;
+        double ratio_ie = 1 - ratio_bi;
 
-        // Apply the inverse rotation
+        // IMU 회전을 LiDAR 프레임으로 보정
+        Eigen::Vector3d rso3_ie = ratio_ie * rso3_be;
+        Sophus::SO3d Rie = Sophus::SO3d::exp(rso3_ie);
+
+        // 보정된 회전과 변환 적용: P_compensate = R_ei * Pi + t_ei
+        Eigen::Vector3d tie = ratio_ie * tbe;
         Eigen::Vector3d pt_vec(pt.x, pt.y, pt.z);
-        Eigen::Vector3d rotated_pt = scaled_so3 * pt_vec;
+        Eigen::Vector3d pt_compensated = Rie.inverse() * (pt_vec - tie);
 
-        PointT new_point;
-        new_point = pt;
-        new_point.x = rotated_pt.x();
-        new_point.y = rotated_pt.y();
-        new_point.z = rotated_pt.z();
-        //cloudOut.points[i] = new_point;
+        // 보정된 포인트 업데이트
+        PointT new_point = pt;
+        new_point.x = pt_compensated.x();
+        new_point.y = pt_compensated.y();
+        new_point.z = pt_compensated.z();
         cloudOut.points.push_back(new_point);
     }
 
-    pre_rotation = rotation;
+    Eigen::Vector3d prev_rso3_be = rso3_be;
 
     auto end_time = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end_time - start_time;
     time_taken = elapsed_seconds.count();
-    saveTimeToFile(undistortion_time_log_path, time_taken);
 }
+*/
 
 template<typename PointT> inline
 void CloudSegmentation<PointT>::downsamplingPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<ClusterPointT>& cloudOut, double& time_taken) 
@@ -682,6 +824,7 @@ void CloudSegmentation<PointT>::adaptiveClustering(const pcl::PointCloud<Cluster
 }
 
 /*
+// TODO: if need
 template<typename PointT> inline
 void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<PointT>& cloudIn, 
                                                      std::vector<pcl::PointCloud<ClusterPointT>>& outputClusters, 

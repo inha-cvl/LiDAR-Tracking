@@ -8,6 +8,8 @@ public:
         // ROS Parameters
         nh_.getParam("Public/map", map);
         nh_.getParam("Tracking/integration/threshIOU", threshIOU);
+        nh_.getParam("Tracking/crop_hd_map/number_front_node", number_front_node);
+        nh_.getParam("Tracking/crop_hd_map/number_back_node", number_back_node);
         nh_.getParam("Tracking/crop_hd_map/radius", crop_hd_map_radius);
 
         global_path = map_reader(map.c_str());
@@ -48,6 +50,8 @@ private:
     std::string map;
     std::vector<std::pair<float, float>> global_path; // Initialization is Public
     float threshIOU;    // IOU threshold for bounding box integration
+    int number_front_node;
+    int number_back_node;
     double crop_hd_map_radius; // Minimum distance threshold for HD map cropping
 
     // average time check
@@ -87,7 +91,7 @@ void Tracking::integrationBbox(const jsk_recognition_msgs::BoundingBoxArray &clu
     time_taken = elapsed_seconds.count();
     saveTimeToFile(integration_time_log_path, time_taken);
 }
-
+/*
 void Tracking::cropHDMapBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, 
                              jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, 
                              const ros::Time &input_stamp, tf2_ros::Buffer &tf_buffer, const std::string target_frame, 
@@ -128,6 +132,69 @@ void Tracking::cropHDMapBbox(const jsk_recognition_msgs::BoundingBoxArray &input
     time_taken = elapsed_seconds.count();
     saveTimeToFile(crophdmap_time_log_path, time_taken);
 }
+*/
+
+void Tracking::cropHDMapBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, 
+                             jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, 
+                             const ros::Time &input_stamp, tf2_ros::Buffer &tf_buffer, const std::string target_frame, 
+                             const std::string world_frame, double& time_taken) 
+{
+    auto start = std::chrono::steady_clock::now();
+
+    output_bbox_array.boxes.clear();
+
+    geometry_msgs::TransformStamped transformStamped;
+    try {
+        transformStamped = tf_buffer.lookupTransform(world_frame, target_frame, ros::Time(0)); // input_stamp
+    } catch (tf2::TransformException &ex) {
+        output_bbox_array = input_bbox_array;
+        return;
+    }
+
+    // 1. transformStamped에서 현재 로봇 위치를 가져오기
+    geometry_msgs::Point current_position;
+    current_position.x = transformStamped.transform.translation.x;
+    current_position.y = transformStamped.transform.translation.y;
+
+    int closest_idx = -1;
+    double min_distance = std::numeric_limits<double>::max();
+    for (size_t i = 0; i < global_path.size(); ++i) {
+        double distance = std::hypot(global_path[i].first - current_position.x, global_path[i].second - current_position.y);
+        if (distance < min_distance) {
+            min_distance = distance;
+            closest_idx = i;
+        }
+    }
+
+    // 3. 전방 20개, 후방 20개의 노드 선택
+    int start_idx = std::max(0, closest_idx - number_back_node);
+    int end_idx = std::min(static_cast<int>(global_path.size()) - 1, closest_idx + number_front_node);
+
+    for (const auto& box : input_bbox_array.boxes) {
+        geometry_msgs::Point transformed_point;
+        tf2::doTransform(box.pose.position, transformed_point, transformStamped);
+
+        bool within_range = false;
+        for (int i = start_idx; i <= end_idx; ++i) {
+            double distance = std::hypot(global_path[i].first - transformed_point.x, global_path[i].second - transformed_point.y);
+            if (distance <= crop_hd_map_radius) {
+                within_range = true;
+                break;
+            }
+        }
+
+        if (within_range) {
+            output_bbox_array.boxes.push_back(box);
+        }
+    }
+
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end - start;
+    time_taken = elapsed_seconds.count();
+    saveTimeToFile(crophdmap_time_log_path, time_taken);
+}
+
+
 
 void Tracking::tracking(Track &tracker, const jsk_recognition_msgs::BoundingBoxArray &bbox_array, 
                         jsk_recognition_msgs::BoundingBoxArray &track_bbox_array, visualization_msgs::MarkerArray &track_text_array,

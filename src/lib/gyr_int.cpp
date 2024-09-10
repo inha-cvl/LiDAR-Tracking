@@ -1,4 +1,4 @@
-#include "undistortion/data_process/gyr_int.h"
+#include "undistortion/gyr_int.h"
 #include <ros/ros.h>
 
 using Sophus::SO3d;

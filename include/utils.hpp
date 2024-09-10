@@ -22,12 +22,18 @@
 
 #include <cstdint>
 #include "sophus/so3.hpp"
+#include "sophus/se3.hpp"
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
 #include <jsoncpp/json/json.h>
 
+#include "undistortion/gyr_int.h"
 #include "lshape/lshaped_fitting.h"
 #include "track/track.h"
+
+#include <message_filters/cache.h>
+#include <message_filters/subscriber.h>
+#include <message_filters/time_synchronizer.h>
 
 template<typename PointT>
 sensor_msgs::PointCloud2 cloud2msg(const pcl::PointCloud<PointT> &cloud, 
@@ -227,30 +233,42 @@ std::vector<cv::Point2f> pcl2Point2f(const pcl::PointCloud<PointT>& cloud, doubl
 }
 
 Eigen::Quaterniond calculateRotationBetweenStamps(const std::deque<sensor_msgs::Imu::ConstPtr>& imu_buffer,
-                                                const ros::Time& last_stamp, const ros::Time& input_stamp) 
+                                                  const ros::Time& last_stamp, const ros::Time& input_stamp) 
 {
-
-    Eigen::Quaterniond rotation_increment = Eigen::Quaterniond::Identity();
+    Sophus::SO3d rotation_increment = Sophus::SO3d(); // Identity rotation
 
     for (const auto& imu : imu_buffer) {
         ros::Time imu_time = imu->header.stamp;
+
         if (imu_time > last_stamp && imu_time <= input_stamp) {
             auto it = std::find(imu_buffer.begin(), imu_buffer.end(), imu);
             if (it != imu_buffer.begin()) {
                 auto prev_it = std::prev(it);
+
+                // 시간 간격 계산
+                double dt1 = input_stamp.toSec() - (*prev_it)->header.stamp.toSec();
+                double dt2 = imu_time.toSec() - input_stamp.toSec();
+                double w1 = dt2 / (dt1 + dt2 + 1e-9);
+                double w2 = dt1 / (dt1 + dt2 + 1e-9);
+
+                // 각속도를 보간하여 평균 각속도를 구함
+                Eigen::Vector3d gyr1((*prev_it)->angular_velocity.x, (*prev_it)->angular_velocity.y, (*prev_it)->angular_velocity.z);
+                Eigen::Vector3d gyr2(imu->angular_velocity.x, imu->angular_velocity.y, imu->angular_velocity.z);
+
+                Eigen::Vector3d angular_velocity = w1 * gyr1 + w2 * gyr2;
+
+                // 회전 변환을 SO3로 변환하고 누적
                 double dt = (imu_time - (*prev_it)->header.stamp).toSec();
-                Eigen::Vector3d angular_velocity(imu->angular_velocity.x,
-                                                 imu->angular_velocity.y,
-                                                 imu->angular_velocity.z);
-                Eigen::Quaterniond delta_rotation(
-                    Eigen::AngleAxisd(angular_velocity.norm() * dt, angular_velocity.normalized())
-                );
-                rotation_increment = delta_rotation * rotation_increment; // 순서가 중요
+                Eigen::Vector3d delta_angle = dt * angular_velocity;
+                Sophus::SO3d delta_rotation = Sophus::SO3d::exp(delta_angle);
+
+                // 변환 순서 유지
+                rotation_increment = delta_rotation * rotation_increment;
             }
         }
     }
 
-    return rotation_increment;
+    return rotation_increment.unit_quaternion();
 }
 
 std::vector<std::pair<float, float>> map_reader(std::string map_path)

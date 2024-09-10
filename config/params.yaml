@@ -60,5 +60,7 @@ Tracking:
   integration:
     threshIOU: 0.3
   crop_hd_map:
+    number_front_node: 200
+    number_back_node: 200
     radius: 5.0
   
