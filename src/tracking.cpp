@@ -1,4 +1,5 @@
 #include <iostream>
+#include <csignal>
 #include "tracking/tracking.hpp"
 
 ros::Publisher pub_track_box;
@@ -18,6 +19,13 @@ jsk_recognition_msgs::BoundingBoxArray cluster_bbox_array, deep_bbox_array, inte
 visualization_msgs::MarkerArray track_text_array, track_model_array;
 
 std::string lidar_frame, target_frame, world_frame;
+
+void signalHandler(int signum) {
+    if (Tracking_) {
+        Tracking_->averageTime();  // 프로그램 종료 전에 averageTime 호출
+    }
+    exit(signum);  // 프로그램 종료
+}
 
 void processTracking()
 {
@@ -110,6 +118,9 @@ int main(int argc, char** argv)
     message_filters::TimeSynchronizer<jsk_recognition_msgs::BoundingBoxArray, jsk_recognition_msgs::BoundingBoxArray> sync(sub_cluster, sub_deep, 1);
     sync.registerCallback(boost::bind(&callbackSync, _1, _2));
 
+    signal(SIGINT, signalHandler);
+    // std::atexit([]() { Tracking_->averageTime(); });
+
     ros::spin();
     return 0;
 }
@@ -199,7 +210,7 @@ int main(int argc, char** argv)
     ros::Subscriber sub_cluster_box = nh.subscribe("/cloud_segmentation/cluster_box", 10, callbackCluster);
     ros::Subscriber sub_deep_box = nh.subscribe("/deep_box", 10, callbackDeep);
 
-    std::atexit([]() { Tracking_->averageTime(); });
+    signal(SIGINT, signalHandler);
 
     ros::spin();
     return 0;

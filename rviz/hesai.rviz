@@ -25,7 +25,7 @@ Panels:
   - Class: rviz/Time
     Name: Time
     SyncMode: 0
-    SyncSource: DownsampledCloud
+    SyncSource: Undistortion
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -128,7 +128,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: FlatColor
       Decay Time: 0
-      Enabled: false
+      Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Min Color: 0; 0; 0
@@ -143,7 +143,7 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: false
+      Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -240,7 +240,7 @@ Visualization Manager:
       Color: 92; 53; 102
       Color Transformer: AxisColor
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 19; 99; 223
       Min Color: 0; 0; 0
@@ -255,7 +255,7 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -418,4 +418,4 @@ Window Geometry:
     collapsed: true
   Width: 1848
   X: 72
-  Y: 257
+  Y: 249

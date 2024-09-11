@@ -1,4 +1,5 @@
 #include <iostream>
+#include <csignal>
 #include "cloud_segmentation/cloud_segmentation.hpp"
 
 using PointType = PointXYZIT;
@@ -28,6 +29,13 @@ ros::Time input_stamp;
 double t1,t2,t3,t4,t5,t6,t7,t8;
 
 std::string lidar_topic, imu_topic, lidar_frame, target_frame, world_frame;
+
+void signalHandler(int signum) {
+    if (CloudSegmentation_) {
+        CloudSegmentation_->averageTime();  // 프로그램 종료 전에 averageTime 호출
+    }
+    exit(signum);  // 프로그램 종료
+}
 
 void callbackIMU(const sensor_msgs::Imu::ConstPtr &msg_in) 
 {
@@ -110,7 +118,8 @@ int main(int argc, char**argv) {
     ros::Subscriber sub_cloud = nh.subscribe(lidar_topic, 10, callbackCloud);
     ros::Subscriber sub_imu = nh.subscribe(imu_topic, 1000, callbackIMU);
     
-    std::atexit([]() { CloudSegmentation_->averageTime(); });
+    signal(SIGINT, signalHandler);
+    // std::atexit([]() { CloudSegmentation_->averageTime(); });
 
     ros::spin();
 
