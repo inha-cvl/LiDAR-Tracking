@@ -641,6 +641,7 @@ void CloudSegmentation<PointT>::undistortPointCloud(const pcl::PointCloud<PointT
     auto end_time = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end_time - start_time;
     time_taken = elapsed_seconds.count();
+    saveTimeToFile(undistortion_time_log_path, time_taken);
 }
 
 /*

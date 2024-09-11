@@ -1,8 +1,0 @@
-projection : 0
-converstion : 0
-crop : 0.00203647
-ground removal : 0.0103191
-undistortion : 0
-downsampling : 0.00360664
-clustering : 0.019589
-Lshape fitting : 0.00631672
