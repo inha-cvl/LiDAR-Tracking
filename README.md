@@ -2,7 +2,7 @@
 
 This is ROS package of LiDAR Tracking
 
-<p align="center"><img src=pictures/patchwork++.gif alt="animated" /></p>
+<p align="center"><img src=pictures/demo.gif alt="animated" /></p>
 
 
 ## :open_file_folder: What's in this repository
@@ -32,20 +32,19 @@ $ roslaunch lidar_tracking demo.launch
 # Start the bag file
 $ roscore
 $ rosparam set /use_sim_time true
-$ rosbag play kiapi.bag
+$ rosbag play kiapi.bag --clock
 ```
 
-## :pushpin: TODO List
-- [ ] Add efficient adaptive clustering 
-- [ ] Add tracking source code
-- [ ] Add Refernce Patchwork, undistortion etc..
+## :pushpin: References
+- https://github.com/url-kaist/patchwork-plusplus-ros
+- https://github.com/SmallMunich/L-Shape-Fitting
+- https://github.com/yzrobot/adaptive_clustering.git
 
 ## Citation
 If you use our codes, please cite our [paper]
 
 
 [paper]: --
-
 
 
 ## :postbox: Contact
