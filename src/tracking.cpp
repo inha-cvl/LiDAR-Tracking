@@ -1,3 +1,4 @@
+/*
 #include <iostream>
 #include <csignal>
 #include "tracking/tracking.hpp"
@@ -119,14 +120,15 @@ int main(int argc, char** argv)
     sync.registerCallback(boost::bind(&callbackSync, _1, _2));
 
     signal(SIGINT, signalHandler);
-    // std::atexit([]() { Tracking_->averageTime(); });
 
     ros::spin();
     return 0;
 }
+*/
 
-/*
+
 #include <iostream>
+#include <csignal>
 #include "tracking/tracking.hpp"
 
 ros::Publisher pub_track_box;
@@ -146,6 +148,13 @@ jsk_recognition_msgs::BoundingBoxArray cluster_bbox_array, deep_bbox_array, inte
 visualization_msgs::MarkerArray track_text_array, track_model_array;
 
 std::string lidar_frame, target_frame, world_frame;
+
+void signalHandler(int signum) {
+    if (Tracking_) {
+        Tracking_->averageTime();  // 프로그램 종료 전에 averageTime 호출
+    }
+    exit(signum);  // 프로그램 종료
+}
 
 // clustering이 더 오래 걸려서 callbackCluster에서 integration
 void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
@@ -215,4 +224,3 @@ int main(int argc, char** argv)
     ros::spin();
     return 0;
 }
-*/

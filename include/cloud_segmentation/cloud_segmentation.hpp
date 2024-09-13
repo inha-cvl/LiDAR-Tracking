@@ -824,7 +824,7 @@ void CloudSegmentation<PointT>::adaptiveClustering(const pcl::PointCloud<Cluster
     saveTimeToFile(clustering_time_log_path, time_taken);
 }
 
-/*
+
 // TODO: if need
 template<typename PointT> inline
 void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<PointT>& cloudIn, 
@@ -934,7 +934,7 @@ void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<Po
     time_taken = elapsed.count();
     saveTimeToFile(clustering_time_log_path, time_taken);
 }
-*/
+
 
 template<typename PointT> inline
 void CloudSegmentation<PointT>::fittingLShape(const std::vector<pcl::PointCloud<ClusterPointT>>& inputClusters, 
