@@ -1,8 +1,8 @@
 projection : 0
 converstion : 0
-crop : 0.00266358
-ground removal : 0.0209002
-undistortion : 0.00485618
-downsampling : 0
-clustering : 0.00842321
-Lshape fitting : 0.00221736
+crop : 0.00220541
+ground removal : 0.00979933
+undistortion : 0.00330705
+downsampling : 0.00299696
+clustering : 0.0248354
+Lshape fitting : 0.0014376

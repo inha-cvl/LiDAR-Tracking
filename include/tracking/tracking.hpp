@@ -14,6 +14,10 @@ public:
 
         global_path = map_reader(map.c_str());
 
+        // integration
+        last_timestamp_cluster = -1;
+        last_timestamp_deep = -1;
+        
         clearLogFile(integration_time_log_path);
         clearLogFile(crophdmap_time_log_path);
         clearLogFile(tracking_time_log_path);
@@ -22,8 +26,8 @@ public:
         clearLogFile(average_time_log_path);
     }
 
-    void integrationBbox(const jsk_recognition_msgs::BoundingBoxArray &cluster_bbox_array, 
-                         const jsk_recognition_msgs::BoundingBoxArray &deep_bbox_array,
+    void integrationBbox(jsk_recognition_msgs::BoundingBoxArray &cluster_bbox_array, 
+                         jsk_recognition_msgs::BoundingBoxArray &deep_bbox_array,
                          jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken);
     
     void cropHDMapBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, 
@@ -53,6 +57,8 @@ private:
     int number_front_node;
     int number_back_node;
     double crop_hd_map_radius; // Minimum distance threshold for HD map cropping
+    double last_timestamp_cluster;
+    double last_timestamp_deep;
 
     // average time check
     std::string package_path = ros::package::getPath("lidar_tracking") + "/time_log/tracking/";
@@ -64,11 +70,18 @@ private:
     std::string average_time_log_path = package_path + "average.txt";
 };
 
-void Tracking::integrationBbox(const jsk_recognition_msgs::BoundingBoxArray &cluster_bbox_array, 
-                               const jsk_recognition_msgs::BoundingBoxArray &deep_bbox_array,
+void Tracking::integrationBbox(jsk_recognition_msgs::BoundingBoxArray &cluster_bbox_array, 
+                               jsk_recognition_msgs::BoundingBoxArray &deep_bbox_array,
                                jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double& time_taken) 
 {
     auto start = std::chrono::steady_clock::now();
+
+    if (cluster_bbox_array.header.stamp.toSec() == last_timestamp_cluster) {
+        cluster_bbox_array.boxes.clear();
+    }
+    if (deep_bbox_array.header.stamp.toSec() == last_timestamp_deep) {
+        deep_bbox_array.boxes.clear();
+    }
 
     output_bbox_array.boxes.clear();
     for (const auto &cluster_bbox : cluster_bbox_array.boxes) {

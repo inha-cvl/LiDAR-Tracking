@@ -48,7 +48,7 @@ Cloud_Segmentation:
       y: -40.0
       z: -1.7
     crop_ring:
-      enabled: false
+      enabled: true
       ring: 2
     crop_intensity:
       enabled: false
