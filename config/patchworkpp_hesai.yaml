@@ -2,7 +2,7 @@ save_flag: true
 
 # patchworkpp:
 
-sensor_height: 2.0
+sensor_height: 1.95
 
 mode: "czm"
 verbose: false   # To check effect of uprightness/elevation/flatness
@@ -18,7 +18,7 @@ th_seeds_v: 0.25        # threshold for lowest point representatives using in in
 th_dist_v: 0.1          # threshold for thickenss of vertical structure.
 max_r: 80.0             # max_range of ground estimation area
 min_r: 2.7              # min_range of ground estimation area
-uprightness_thr: 0.5  # 0.707 # threshold of uprightness using in Ground Likelihood Estimation(GLE). Please refer paper for more information about GLE.
+uprightness_thr: 0.707  # 0.707 # threshold of uprightness using in Ground Likelihood Estimation(GLE). Please refer paper for more information about GLE.
 
 adaptive_seed_selection_margin: -1.2 # The points below the adaptive_seed_selection_margin * sensor_height are filtered
 czm:

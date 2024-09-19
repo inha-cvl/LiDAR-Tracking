@@ -3,26 +3,6 @@
 
 using namespace cv;
 
-std::pair<float, float> getIQRThreshold(const std::vector<float> &data, float multiplier)
-{
-    std::vector<float> sortedData = data;
-    std::sort(sortedData.begin(), sortedData.end());
-
-    int dataSize = sortedData.size();
-    int q1Index = dataSize / 4;
-    int q3Index = 3 * dataSize / 4;
-
-    float q1 = sortedData[q1Index];
-    float q3 = sortedData[q3Index];
-
-    float iqr = q3 - q1;
-    float lowerThreshold = q1 - multiplier * iqr;
-    float upperThreshold = q3 + multiplier * iqr;
-
-    // return std::max(lowerThreshold, 0.0f); // Ensure the threshold is non-negative
-	return std::make_pair(lowerThreshold, upperThreshold);
-}
-
 //constructor
 Track::Track()
 {
@@ -34,13 +14,13 @@ Track::Track()
 	//A & Q ==> Predict process
 	//H & R ==> Estimation process
 	
-	dt = 0.05; // 0.01
+	// dt = 0.05; // 0.01
 
 	// A
 	m_matTransition = (Mat_<float>(stateVariableDim, stateVariableDim) << 1, 0, dt, 0,
 																		  0, 1, 0, dt,
-																		  0, 0, 0, 0,
-																		  0, 0, 0, 0);
+																		  0, 0, 1, 0,
+																		  0, 0, 0, 1);
 
 	// H
 	m_matMeasurement = (Mat_<float>(stateMeasureDim, stateVariableDim) << 1, 0, 0, 0,
@@ -79,31 +59,6 @@ float Track::getVectorScale(float v1, float v2)
 	else return distance;
 }
 
-double Track::getBBoxIOU(jsk_recognition_msgs::BoundingBox bbox1, jsk_recognition_msgs::BoundingBox bbox2)
-{
-	double boxA[4] = {bbox1.pose.position.x - bbox1.dimensions.x/2.0, 
-					 bbox1.pose.position.y - bbox1.dimensions.y/2.0, 
-					 bbox1.pose.position.x + bbox1.dimensions.x/2.0, 
-					 bbox1.pose.position.y + bbox1.dimensions.y/2.0};
- 	double boxB[4] = {bbox2.pose.position.x - bbox2.dimensions.x/2.0, 
-					 bbox2.pose.position.y - bbox2.dimensions.y/2.0, 
-					 bbox2.pose.position.x + bbox2.dimensions.x/2.0, 
-					 bbox2.pose.position.y + bbox2.dimensions.y/2.0};
-	double xA = max(boxA[0], boxB[0]);
-	double yA = max(boxA[1], boxB[1]);
-	double xB = min(boxA[2], boxB[2]);
-	double yB = min(boxA[3], boxB[3]);
-
-	double interArea = max(0.0, xB - xA + 1) * max(0.0, yB - yA + 1);
- 	
- 	double boxAArea = (boxA[2] - boxA[0] + 1) * (boxA[3] - boxA[1] + 1);
-	double boxBArea = (boxB[2] - boxB[0] + 1) * (boxB[3] - boxB[1] + 1);
-
-	double iou = interArea / double(boxAArea + boxBArea - interArea);
-
-	return iou;
-}
-
 double Track::getBBoxRatio(jsk_recognition_msgs::BoundingBox bbox1, jsk_recognition_msgs::BoundingBox bbox2)
 {
 	double boxA[4] = {bbox1.pose.position.x - bbox1.dimensions.x/2.0, 
@@ -115,26 +70,14 @@ double Track::getBBoxRatio(jsk_recognition_msgs::BoundingBox bbox1, jsk_recognit
 					 bbox2.pose.position.x + bbox2.dimensions.x/2.0, 
 					 bbox2.pose.position.y + bbox2.dimensions.y/2.0};
  	
- 	double boxAArea = (boxA[2] - boxA[0] + 1) * (boxA[3] - boxA[1] + 1);
-	double boxBArea = (boxB[2] - boxB[0] + 1) * (boxB[3] - boxB[1] + 1);
+ 	double boxAArea = (boxA[2] - boxA[0]) * (boxA[3] - boxA[1]);
+	double boxBArea = (boxB[2] - boxB[0]) * (boxB[3] - boxB[1]);
 
 	double gap;
 	if(boxAArea > boxBArea) gap = boxAArea / boxBArea;
 	else gap = boxBArea / boxAArea;
 
 	return gap;
-}
-
-double Track::getBBoxArea(jsk_recognition_msgs::BoundingBox bbox1)
-{
-	double boxA[4] = {bbox1.pose.position.x - bbox1.dimensions.x/2.0, 
-					 bbox1.pose.position.y - bbox1.dimensions.y/2.0, 
-					 bbox1.pose.position.x + bbox1.dimensions.x/2.0, 
-					 bbox1.pose.position.y + bbox1.dimensions.y/2.0};
- 	
- 	double boxAArea = (boxA[2] - boxA[0] + 1) * (boxA[3] - boxA[1] + 1);
-
-	return boxAArea;
 }
 
 double Track::getBBoxDistance(jsk_recognition_msgs::BoundingBox bbox1, jsk_recognition_msgs::BoundingBox bbox2)
@@ -172,10 +115,15 @@ visualization_msgs::Marker Track::get_text_msg(struct trackingStruct &track, int
 	return text;
 }
 
-void Track::predictNewLocationOfTracks()
+void Track::predictNewLocationOfTracks(const ros::Time &currentTime)
 {
 	for (int i = 0; i < vecTracks.size(); i++)
 	{
+		dt = currentTime.toSec() - vecTracks[i].lastTime;
+
+		vecTracks[i].kf.transitionMatrix.at<float>(0, 2) = dt;
+        vecTracks[i].kf.transitionMatrix.at<float>(1, 3) = dt;
+
 		// Predict current state
 		vecTracks[i].kf.predict();
 
@@ -198,8 +146,6 @@ void Track::assignDetectionsTracks(const jsk_recognition_msgs::BoundingBoxArray 
 	{
 		for (int j = 0; j < M; j++)
 		{
-			// Box Over Lap
-			// Cost[i][j] = 1 - getBBoxIOU(vecTracks[i].cur_bbox, bboxArray.boxes[j]);
 			// Distance
 			Cost[i][j] = getBBoxDistance(vecTracks[i].cur_bbox, bboxArray.boxes[j]);
 		}
@@ -214,14 +160,14 @@ void Track::assignDetectionsTracks(const jsk_recognition_msgs::BoundingBoxArray 
 	}
 
 	vecAssignments.clear();
-	vecUnssignedTracks.clear();
+	vecUnassignedTracks.clear();
 	vecUnssignedDetections.clear();
 
 	for (int i = 0; i < N; i++)
 	{
 		if (assignment[i] == -1)
 		{
-			vecUnssignedTracks.push_back(i);
+			vecUnassignedTracks.push_back(i);
 		}
 		else
 		{
@@ -231,7 +177,7 @@ void Track::assignDetectionsTracks(const jsk_recognition_msgs::BoundingBoxArray 
 			}
 			else
 			{
-				vecUnssignedTracks.push_back(i);
+				vecUnassignedTracks.push_back(i);
 				assignment[i] = -1;
 			}
 		}
@@ -256,7 +202,7 @@ std::tuple<double, double> Track::convertAbsoluteCoordinates(double absoluteX, d
 }
 
 // 상대 좌표계
-void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &bboxArray, const ros::Time &lidarSec)
+void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &bboxArray)
 {	
 	for (int i = 0; i < (int)vecAssignments.size(); i++)
 	{
@@ -268,21 +214,15 @@ void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &b
 		measure.at<float>(1) = bboxArray.boxes[idD].pose.position.y;
 		vecTracks[idT].kf.correct(measure);
 		
-		float vx = (bboxArray.boxes[idD].pose.position.x - vecTracks[idT].pre_bbox.pose.position.x) / dt;
-		float vy = (bboxArray.boxes[idD].pose.position.y - vecTracks[idT].pre_bbox.pose.position.y) / dt;
-		float v = getVectorScale(vx, vy);
-
-		deque_push_back(vecTracks[idT].vx_deque, vx);
-		deque_push_back(vecTracks[idT].vy_deque, vy);
-		deque_push_back(vecTracks[idT].v_deque, v);
-
+		deque_push_back(vecTracks[idT].vx_deque, vecTracks[idT].kf.statePost.at<float>(2));
+		deque_push_back(vecTracks[idT].vy_deque, vecTracks[idT].kf.statePost.at<float>(3));
+		deque_push_back(vecTracks[idT].v_deque, getVectorScale(vecTracks[idT].kf.statePost.at<float>(2), vecTracks[idT].kf.statePost.at<float>(3)));
 		vecTracks[idT].vx = std::accumulate(vecTracks[idT].vx_deque.begin(), vecTracks[idT].vx_deque.end(), 0.0) / vecTracks[idT].vx_deque.size();
 		vecTracks[idT].vy = std::accumulate(vecTracks[idT].vy_deque.begin(), vecTracks[idT].vy_deque.end(), 0.0) / vecTracks[idT].vy_deque.size();
 		vecTracks[idT].v = std::accumulate(vecTracks[idT].v_deque.begin(), vecTracks[idT].v_deque.end(), 0.0) / vecTracks[idT].v_deque.size();
 
 		//vecTracks[idT].cur_bbox.header.stamp = ros::Time::now(); // mingu 중요, 이거 안 하면 time stamp 안 맞아서 스탬프가 오래됐을 경우 rviz에서 제대로 표시 안됨
 		vecTracks[idT].cur_bbox.header.stamp = bboxArray.boxes[idD].header.stamp; // 쩔수없이..
-
 		//std::cout << bboxArray.boxes[idD].header.stamp << std::endl;
 
 		if (bboxArray.boxes[idD].label == 0 && vecTracks[idT].pre_bbox.label != 0) {
@@ -297,7 +237,8 @@ void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &b
 		vecTracks[idT].cur_bbox.label = bboxArray.boxes[idD].label; // mingu
 		
 		vecTracks[idT].pre_bbox = vecTracks[idT].cur_bbox;
-		vecTracks[idT].sec = lidarSec.toSec();
+		// vecTracks[idT].sec = lidarSec.toSec();
+		vecTracks[idT].lastTime = bboxArray.boxes[idD].header.stamp.toSec();
 		vecTracks[idT].age++;
 		vecTracks[idT].cntTotalVisible++;
 		vecTracks[idT].cntConsecutiveInvisible = 0;
@@ -306,9 +247,9 @@ void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &b
 
 void Track::unassignedTracksUpdate()
 {
-	for (int i = 0; i < (int)vecUnssignedTracks.size(); i++)
+	for (int i = 0; i < (int)vecUnassignedTracks.size(); i++)
 	{
-		int id = vecUnssignedTracks[i];
+		int id = vecUnassignedTracks[i];
 		vecTracks[id].age++;
 		vecTracks[id].cntConsecutiveInvisible++;
 	}
@@ -320,14 +261,15 @@ void Track::deleteLostTracks()
 	{
 		return;
 	}
-	for (int i = 0; i < (int)vecTracks.size(); i++)
+
+	for (int i = vecTracks.size() - 1; i >= 0; i--)
 	{
 		if (vecTracks[i].cntConsecutiveInvisible >= m_thres_invisibleCnt)
 		{
 			vecTracks.erase(vecTracks.begin() + i);
-			i--;
 		}
 	}
+
 }
 
 void Track::createNewTracks(const jsk_recognition_msgs::BoundingBoxArray &bboxArray)
@@ -366,6 +308,8 @@ void Track::createNewTracks(const jsk_recognition_msgs::BoundingBoxArray &bboxAr
 		ts.kf.statePost.at<float>(2) = ts.vx;
 		ts.kf.statePost.at<float>(3) = ts.vy;
 
+		ts.lastTime = bboxArray.boxes[id].header.stamp.toSec();
+		
 		vecTracks.push_back(ts);
 	}
 }

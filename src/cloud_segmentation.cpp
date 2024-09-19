@@ -32,9 +32,9 @@ std::string lidar_topic, imu_topic, lidar_frame, target_frame, world_frame;
 
 void signalHandler(int signum) {
     if (CloudSegmentation_) {
-        CloudSegmentation_->averageTime();  // 프로그램 종료 전에 averageTime 호출
+        CloudSegmentation_->averageTime();
     }
-    exit(signum);  // 프로그램 종료
+    exit(signum);
 }
 
 void callbackIMU(const sensor_msgs::Imu::ConstPtr &msg_in) 
@@ -65,10 +65,10 @@ void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
     // pub_non_ground.publish(cloud2msg(nonGroundCloud, input_stamp, lidar_frame));
 
     CloudSegmentation_->undistortPointCloud(nonGroundCloud, undistortionCloud, t5);
-    // pub_undistortion_cloud.publish(cloud2msg(undistortionCloud, input_stamp, lidar_frame));
+    pub_undistortion_cloud.publish(cloud2msg(undistortionCloud, input_stamp, lidar_frame));
 
     CloudSegmentation_->downsamplingPointCloud(undistortionCloud, downsamplingCloud, t6);
-    pub_downsampling_cloud.publish(cloud2msg(downsamplingCloud, input_stamp, lidar_frame));
+    // pub_downsampling_cloud.publish(cloud2msg(downsamplingCloud, input_stamp, lidar_frame));
 
     CloudSegmentation_->adaptiveClustering(downsamplingCloud, cluster_array, t7);
     // CloudSegmentation_->adaptiveVoxelClustering(undistortionCloud, cluster_array, t7);
@@ -76,15 +76,15 @@ void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
     CloudSegmentation_->fittingLShape(cluster_array, lidar_frame, cluster_bbox_array, t8);
     pub_cluster_box.publish(bba2msg(cluster_bbox_array, input_stamp, lidar_frame));
 
-    std::cout << "\033[2J" << "\033[" << 10 << ";" << 30 << "H" << std::endl;
-    std::cout << "projection : " << t1 << " sec" << std::endl;
-    std::cout << "converstion : " << t2 << " sec" << std::endl;
-    std::cout << "crop : " << t3 << " sec" << std::endl;
-    std::cout << "ground removal : " << t4 << " sec" << std::endl;
-    std::cout << "undistortion : " << t5 << " sec" << std::endl;
-    std::cout << "downsampling : " << t6 << " sec" << std::endl;
-    std::cout << "clustering : " << t7 << " sec" << std::endl;
-    std::cout << "lshape fitting : " << t8 << " sec" << std::endl;
+    // std::cout << "\033[2J" << "\033[" << 10 << ";" << 30 << "H" << std::endl;
+    // std::cout << "projection : " << t1 << " sec" << std::endl;
+    // std::cout << "converstion : " << t2 << " sec" << std::endl;
+    // std::cout << "crop : " << t3 << " sec" << std::endl;
+    // std::cout << "ground removal : " << t4 << " sec" << std::endl;
+    // std::cout << "undistortion : " << t5 << " sec" << std::endl;
+    // std::cout << "downsampling : " << t6 << " sec" << std::endl;
+    // std::cout << "clustering : " << t7 << " sec" << std::endl;
+    // std::cout << "lshape fitting : " << t8 << " sec" << std::endl;
 }
 
 int main(int argc, char**argv) {

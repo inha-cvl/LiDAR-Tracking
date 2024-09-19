@@ -29,6 +29,8 @@ struct trackingStruct
 	double sec;
 
 	cv::KalmanFilter kf;
+
+	double lastTime;
 };
 
 class Track
@@ -53,7 +55,7 @@ private:
 	// Global variables
 	vector<trackingStruct> vecTracks;
 	vector<pair<int, int>> vecAssignments;
-	vector<int> vecUnssignedTracks;
+	vector<int> vecUnassignedTracks;
 	vector<int> vecUnssignedDetections;
 
 public:
@@ -63,15 +65,13 @@ public:
 	~Track();
 	void deque_push_back(std::deque<float> &deque, float v);
 	float getVectorScale(float v1, float v2);
-	double getBBoxIOU(jsk_recognition_msgs::BoundingBox bbox1, jsk_recognition_msgs::BoundingBox bbox2);
 	double getBBoxRatio(jsk_recognition_msgs::BoundingBox bbox1, jsk_recognition_msgs::BoundingBox bbox2);
 	double getBBoxDistance(jsk_recognition_msgs::BoundingBox bbox1, jsk_recognition_msgs::BoundingBox bbox2);
 	visualization_msgs::Marker get_text_msg(struct trackingStruct &track, int i);
-	double getBBoxArea(jsk_recognition_msgs::BoundingBox bbox1);
-	void predictNewLocationOfTracks();
+	void predictNewLocationOfTracks(const ros::Time &currentTime);
 	void assignDetectionsTracks(const jsk_recognition_msgs::BoundingBoxArray &bboxMarkerArray);
 	std::tuple<double, double> convertAbsoluteCoordinates(double absoluteX, double absoluteY, double theta, double trackX, double trackY);
-	void assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &bboxMarkerArray, const ros::Time &lidarSec);
+	void assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &bboxMarkerArray);
 	void unassignedTracksUpdate();
 	void deleteLostTracks();
 	void createNewTracks(const jsk_recognition_msgs::BoundingBoxArray &bboxMarkerArray);

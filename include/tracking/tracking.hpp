@@ -178,9 +178,9 @@ void Tracking::tracking(Track &tracker, const jsk_recognition_msgs::BoundingBoxA
 
     track_bbox_array.boxes.clear();
     track_text_array.markers.clear();
-    tracker.predictNewLocationOfTracks();
+    tracker.predictNewLocationOfTracks(input_stamp);
     tracker.assignDetectionsTracks(bbox_array);
-    tracker.assignedTracksUpdate(bbox_array, input_stamp);
+    tracker.assignedTracksUpdate(bbox_array);
     tracker.unassignedTracksUpdate();
     tracker.deleteLostTracks();
     tracker.createNewTracks(bbox_array);
