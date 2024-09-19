@@ -94,6 +94,7 @@ public:
     void fittingLShape(const std::vector<pcl::PointCloud<ClusterPointT>>& inputClusters, const std::string lidar_frame,
                         jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken);
 
+    // TODO
     void adaptiveVoxelClustering(const pcl::PointCloud<PointT>& cloudIn, 
                                                      std::vector<pcl::PointCloud<ClusterPointT>>& outputClusters, 
                                                      double& time_taken);
@@ -195,56 +196,6 @@ void CloudSegmentation<PointT>::imuUpdate(const sensor_msgs::Imu::ConstPtr &imu_
 {   
     imu_cache.add(imu_msg);
 }
-
-/*
-// TODO: Synchronization
-template<typename PointT> inline
-void CloudSegmentation<PointT>::imuUpdate(const sensor_msgs::Imu::ConstPtr &imu_msg)
-{
-    double timestamp = imu_msg->header.stamp.toSec();
-
-    // IMU 데이터의 타임스탬프가 이전 데이터보다 작은 경우(루프백 현상) 버퍼를 초기화하고 통합기를 리셋
-    if (timestamp < last_timestamp_imu) {
-        ROS_ERROR("IMU loop back detected, clearing buffer");
-        imu_buffer.clear();  // 버퍼 초기화
-        gyr_int_.Reset(timestamp, imu_msg);  // 통합기 리셋
-    }
-    last_timestamp_imu = timestamp;  // 최신 IMU 타임스탬프 업데이트
-
-    imu_buffer.push_back(imu_msg);
-
-    // if (imu_buffer.size() > MAX_IMU_BUFFER_SIZE) {
-    //     imu_buffer.pop_front();  // 가장 오래된 IMU 데이터를 제거
-    // }
-
-    // imu_buffer가 비어있지 않은지 확인 후 마지막 IMU 데이터 업데이트
-    if (!imu_buffer.empty()) {
-        last_imu_ = imu_buffer.back();  // 마지막 IMU 데이터로 업데이트
-    } else {
-        ROS_WARN("imu_buffer is empty, cannot update last_imu_");
-    }
-
-    // Lidar 데이터 타임스탬프와 IMU 데이터의 타임스탬프가 일치하지 않으면 IMU 데이터를 통합
-    if (cur_stamp != rotation_stamp) {
-        // last_imu_가 유효한지 체크
-        if (last_imu_) {
-            gyr_int_.Reset(pre_stamp.toSec(), last_imu_);  // Reset with the last IMU data
-        } else {
-            ROS_WARN("last_imu_ is null, skipping integration reset");
-        }
-        // 버퍼에 있는 모든 IMU 데이터를 사용해 회전값 통합
-        for (const auto &imu : imu_buffer) {
-            gyr_int_.Integrate(imu);  // IMU 데이터를 통합하여 회전값 계산
-        }
-
-        imu_buffer.clear();
-    }
-    
-    // 현재 Lidar 타임스탬프를 rotation_stamp로 업데이트하여 다음 통합 시점 결정
-    rotation_stamp = cur_stamp;
-}
-*/
-
 
 template<typename PointT> inline
 void CloudSegmentation<PointT>::projectPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double& time_taken) 
