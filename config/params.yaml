@@ -34,7 +34,7 @@ Cloud_Segmentation:
       number_region: 10
       min_leaf_size: 0.2 # no use
       max_leaf_size: 0.4 # no use
-      threshIOU: 0.3
+      thresh_iou: 0.3
     L_shape_fitting:
       projection_range: 0.2
 
@@ -58,9 +58,16 @@ Cloud_Segmentation:
 
 Tracking:
   integration:
-    threshIOU: 0.3
+    thresh_iou: 0.1
   crop_hd_map:
     number_front_node: 200
     number_back_node: 200
     radius: 5.0
+  track:
+    invisibleCnt: 10
+    deque:
+      number_velocity: 4
+      number_orientation: 6
+      thresh_velocity:  10 # m/s
+      thresh_orientation: 30 # degree
   

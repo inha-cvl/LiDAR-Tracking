@@ -32,7 +32,7 @@ public:
         nh_.getParam("Cloud_Segmentation/clustering/adaptive/number_region", number_region);
         nh_.getParam("Cloud_Segmentation/clustering/adaptive/min_leaf_size", min_leaf_size);
         nh_.getParam("Cloud_Segmentation/clustering/adaptive/max_leaf_size", max_leaf_size);
-        nh_.getParam("Cloud_Segmentation/clustering/adaptive/threshIOU", threshIOU);
+        nh_.getParam("Cloud_Segmentation/clustering/adaptive/thresh_iou", thresh_iou);
         nh_.getParam("Cloud_Segmentation/clustering/L_shape_fitting/projection_range", projection_range);
         nh_.getParam("Cloud_Segmentation/crop/max/x", roi_max_x);
         nh_.getParam("Cloud_Segmentation/crop/max/y", roi_max_y);
@@ -133,7 +133,7 @@ private:
     float delta_tolerance; // Initialization is Public
     float min_leaf_size; // no use
     float max_leaf_size; // no use
-    float threshIOU; // Intersection over Union threshold for clustering
+    float thresh_iou; // Intersection over Union threshold for clustering
     
     // L-shape fitting parameters
     float projection_range; // Projection range for L-shape fitting
@@ -932,7 +932,7 @@ void CloudSegmentation<PointT>::fittingLShape(const std::vector<pcl::PointCloud<
     for (int i = 0; i < output_bbox_array.boxes.size(); ++i) {
         for (int j = i + 1; j < output_bbox_array.boxes.size();) {
             double overlap = getBBoxOverlap(output_bbox_array.boxes[j], output_bbox_array.boxes[i]);
-            if (overlap > threshIOU) {
+            if (overlap > thresh_iou) {
                 auto& box_i = output_bbox_array.boxes[i];
                 auto& box_j = output_bbox_array.boxes[j];
 

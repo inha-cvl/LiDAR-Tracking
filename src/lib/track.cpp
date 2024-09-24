@@ -9,7 +9,11 @@ Track::Track()
 	stateVariableDim = 4; // cx, cy, dx, dy
 	stateMeasureDim = 2;  // cx, cy
 	nextID = 0;
-	m_thres_invisibleCnt = 6; // 3
+	m_thres_invisibleCnt = 6;
+	n_velocity_deque = 6;
+	n_orientation_deque = 6;
+	thr_velocity = 10; // m/s
+	thr_orientation = M_PI / 6; // 30 degree
 
 	//A & Q ==> Predict process
 	//H & R ==> Estimation process
@@ -43,14 +47,49 @@ Track::Track()
 //deconstructor
 Track::~Track(){}
 
-void Track::deque_push_back(std::deque<float> &deque, float v) 
+void Track::velocity_push_back(std::deque<float> &deque, float v) 
 {
-	if (deque.size() < 4) { deque.push_back(v); }
+	if (deque.size() < n_velocity_deque) { deque.push_back(v); }
 	else { // 제로백 5초 기준 가속도는 5.556m/(s*)
-		if (abs(deque.back() - v) < 10) { deque.push_back(v); }
+		if (abs(deque.back() - v) < thr_velocity) { deque.push_back(v); }
 		else { deque.push_back(0.0); }
 		deque.pop_front(); }
 }
+
+void Track::orientation_push_back(std::deque<float> &deque, float o)
+{
+    // 현재 deque 크기가 max_size 미만이면 새로운 값을 추가
+    if (deque.size() < n_orientation_deque) {
+        deque.push_back(o);
+    }
+    else {
+        // 이전 값들의 평균 계산
+        float sum_yaw = 0.0;
+        for (size_t i = 0; i < deque.size(); ++i) {
+            sum_yaw += deque[i];
+        }
+        float avg_yaw = sum_yaw / deque.size();
+
+        // 새로운 값과 평균의 차이 계산 (각도 차이의 절댓값)
+        float yaw_diff = std::fabs(angles::shortest_angular_distance(avg_yaw, o));
+
+        // 임계값 설정 (예: 30도)
+        float yaw_threshold = thr_orientation; // 30도를 라디안으로 변환
+
+        if (yaw_diff <= yaw_threshold) {
+            // 차이가 임계값 이내이면 새로운 값을 추가
+            deque.push_back(o);
+        }
+        else {
+            // 차이가 너무 크면 이전 값을 다시 추가하여 deque 크기 유지
+            deque.push_back(deque.back());
+        }
+
+		deque.pop_front();
+    }
+}
+
+
 
 float Track::getVectorScale(float v1, float v2)
 {
@@ -191,16 +230,6 @@ void Track::assignDetectionsTracks(const jsk_recognition_msgs::BoundingBoxArray 
 	}
 }
 
-std::tuple<double, double> Track::convertAbsoluteCoordinates(double absoluteX, double absoluteY, double angle, double trackX, double trackY)
-{
-	double x, y, theta;
-	theta = angle * (M_PI / 180.0);
-	x = absoluteX + (trackX * cos(theta) - trackY * sin(theta));
-	y = absoluteY + (trackX * sin(theta) + trackY * cos(theta));
-
-	return std::make_tuple(x,y);
-}
-
 // 상대 좌표계
 void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &bboxArray)
 {	
@@ -214,28 +243,32 @@ void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &b
 		measure.at<float>(1) = bboxArray.boxes[idD].pose.position.y;
 		vecTracks[idT].kf.correct(measure);
 		
-		deque_push_back(vecTracks[idT].vx_deque, vecTracks[idT].kf.statePost.at<float>(2));
-		deque_push_back(vecTracks[idT].vy_deque, vecTracks[idT].kf.statePost.at<float>(3));
-		deque_push_back(vecTracks[idT].v_deque, getVectorScale(vecTracks[idT].kf.statePost.at<float>(2), vecTracks[idT].kf.statePost.at<float>(3)));
+		velocity_push_back(vecTracks[idT].vx_deque, vecTracks[idT].kf.statePost.at<float>(2));
+		velocity_push_back(vecTracks[idT].vy_deque, vecTracks[idT].kf.statePost.at<float>(3));
+		// velocity_push_back(vecTracks[idT].v_deque, getVectorScale(vecTracks[idT].kf.statePost.at<float>(2), vecTracks[idT].kf.statePost.at<float>(3)));
+		velocity_push_back(vecTracks[idT].v_deque, std::hypot(vecTracks[idT].kf.statePost.at<float>(2), vecTracks[idT].kf.statePost.at<float>(3)));
 		vecTracks[idT].vx = std::accumulate(vecTracks[idT].vx_deque.begin(), vecTracks[idT].vx_deque.end(), 0.0) / vecTracks[idT].vx_deque.size();
 		vecTracks[idT].vy = std::accumulate(vecTracks[idT].vy_deque.begin(), vecTracks[idT].vy_deque.end(), 0.0) / vecTracks[idT].vy_deque.size();
 		vecTracks[idT].v = std::accumulate(vecTracks[idT].v_deque.begin(), vecTracks[idT].v_deque.end(), 0.0) / vecTracks[idT].v_deque.size();
 
-		//vecTracks[idT].cur_bbox.header.stamp = ros::Time::now(); // mingu 중요, 이거 안 하면 time stamp 안 맞아서 스탬프가 오래됐을 경우 rviz에서 제대로 표시 안됨
-		vecTracks[idT].cur_bbox.header.stamp = bboxArray.boxes[idD].header.stamp; // 쩔수없이..
-		//std::cout << bboxArray.boxes[idD].header.stamp << std::endl;
+		// 이전 orientation들과 비교
+        orientation_push_back(vecTracks[idT].orientation_deque, tf::getYaw(bboxArray.boxes[idD].pose.orientation));
+		vecTracks[idT].cur_bbox.pose.orientation = tf::createQuaternionMsgFromYaw(vecTracks[idT].orientation_deque.back());
 
-		if (bboxArray.boxes[idD].label == 0 && vecTracks[idT].pre_bbox.label != 0) {
+		// 0.5초 이상 추적 된 객체가 딥러닝 기반일 시, 딥러닝 정보를 우선적으로 사용
+		if (bboxArray.boxes[idD].label == 0 && vecTracks[idT].pre_bbox.label != 0 && vecTracks[idT].age > 10) {
 			vecTracks[idT].cur_bbox.dimensions = vecTracks[idT].pre_bbox.dimensions;
-			vecTracks[idT].cur_bbox.pose.orientation = vecTracks[idT].pre_bbox.pose.orientation; }
+			vecTracks[idT].cur_bbox.pose.orientation = vecTracks[idT].pre_bbox.pose.orientation; 
+			vecTracks[idT].cur_bbox.label = vecTracks[idT].pre_bbox.label; }
 		else {
 			vecTracks[idT].cur_bbox.dimensions = bboxArray.boxes[idD].dimensions;
-			vecTracks[idT].cur_bbox.pose.orientation = bboxArray.boxes[idD].pose.orientation; }
+			vecTracks[idT].cur_bbox.pose.orientation = bboxArray.boxes[idD].pose.orientation;
+			vecTracks[idT].cur_bbox.label = bboxArray.boxes[idD].label; }
 		
 		vecTracks[idT].cur_bbox.pose.position = bboxArray.boxes[idD].pose.position;
+		// vecTracks[idT].cur_bbox.label = bboxArray.boxes[idD].label;
+		vecTracks[idT].cur_bbox.header.stamp = bboxArray.boxes[idD].header.stamp; // 중요, 이거 안 하면 time stamp 안 맞아서 스탬프가 오래됐을 경우 rviz에서 제대로 표시 안됨
 
-		vecTracks[idT].cur_bbox.label = bboxArray.boxes[idD].label; // mingu
-		
 		vecTracks[idT].pre_bbox = vecTracks[idT].cur_bbox;
 		// vecTracks[idT].sec = lidarSec.toSec();
 		vecTracks[idT].lastTime = bboxArray.boxes[idD].header.stamp.toSec();

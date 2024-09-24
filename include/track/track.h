@@ -7,8 +7,8 @@
 #include <numeric>
 #include <vector>
 #include <cmath>
-//#include <tf/tf.h>
-//#include <jsk_recognition_msgs/BoundingBox.h>
+#include <angles/angles.h>
+#include <tf/tf.h>
 #include <jsk_recognition_msgs/BoundingBoxArray.h>
 #include <visualization_msgs/MarkerArray.h>
 
@@ -26,6 +26,7 @@ struct trackingStruct
 
 	float vx, vy, v;
 	std::deque<float> v_deque, vx_deque, vy_deque;
+	std::deque<float> orientation_deque;
 	double sec;
 
 	cv::KalmanFilter kf;
@@ -41,6 +42,11 @@ private:
 	int stateMeasureDim;
 	unsigned int nextID;
 	unsigned int m_thres_invisibleCnt;
+	int n_velocity_deque;
+	int n_orientation_deque;
+	float thr_velocity;
+	float thr_orientation;
+
 
 	cv::Mat m_matTransition;
 	cv::Mat m_matMeasurement;
@@ -63,14 +69,29 @@ public:
 	Track();
 	//deconstructor
 	~Track();
-	void deque_push_back(std::deque<float> &deque, float v);
+	
+	void setParams(int invisibleCnt,
+				   int number_velocity_deque,
+				   int number_orientation_deque,
+				   float thresh_velocity,
+				   float thresh_orientation
+	)
+	{
+		m_thres_invisibleCnt = invisibleCnt;
+		n_velocity_deque = number_velocity_deque;
+		n_orientation_deque = number_orientation_deque;
+		thr_velocity = thresh_velocity;
+		thr_orientation = thresh_orientation;
+	};
+
+	void velocity_push_back(std::deque<float> &deque, float v);
+	void orientation_push_back(std::deque<float> &deque, float o);
 	float getVectorScale(float v1, float v2);
 	double getBBoxRatio(jsk_recognition_msgs::BoundingBox bbox1, jsk_recognition_msgs::BoundingBox bbox2);
 	double getBBoxDistance(jsk_recognition_msgs::BoundingBox bbox1, jsk_recognition_msgs::BoundingBox bbox2);
 	visualization_msgs::Marker get_text_msg(struct trackingStruct &track, int i);
 	void predictNewLocationOfTracks(const ros::Time &currentTime);
 	void assignDetectionsTracks(const jsk_recognition_msgs::BoundingBoxArray &bboxMarkerArray);
-	std::tuple<double, double> convertAbsoluteCoordinates(double absoluteX, double absoluteY, double theta, double trackX, double trackY);
 	void assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &bboxMarkerArray);
 	void unassignedTracksUpdate();
 	void deleteLostTracks();
