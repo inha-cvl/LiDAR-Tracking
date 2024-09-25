@@ -58,38 +58,20 @@ void Track::velocity_push_back(std::deque<float> &deque, float v)
 
 void Track::orientation_push_back(std::deque<float> &deque, float o)
 {
-    // 현재 deque 크기가 max_size 미만이면 새로운 값을 추가
-    if (deque.size() < n_orientation_deque) {
-        deque.push_back(o);
-    }
+    if (deque.size() < n_orientation_deque) { deque.push_back(o); }
     else {
-        // 이전 값들의 평균 계산
         float sum_yaw = 0.0;
-        for (size_t i = 0; i < deque.size(); ++i) {
-            sum_yaw += deque[i];
-        }
-        float avg_yaw = sum_yaw / deque.size();
+        for (size_t i = 0; i < deque.size(); ++i) { sum_yaw += deque[i]; }
 
-        // 새로운 값과 평균의 차이 계산 (각도 차이의 절댓값)
+        float avg_yaw = sum_yaw / deque.size();
         float yaw_diff = std::fabs(angles::shortest_angular_distance(avg_yaw, o));
 
-        // 임계값 설정 (예: 30도)
-        float yaw_threshold = thr_orientation; // 30도를 라디안으로 변환
-
-        if (yaw_diff <= yaw_threshold) {
-            // 차이가 임계값 이내이면 새로운 값을 추가
-            deque.push_back(o);
-        }
-        else {
-            // 차이가 너무 크면 이전 값을 다시 추가하여 deque 크기 유지
-            deque.push_back(deque.back());
-        }
+        if (yaw_diff <= thr_orientation) { deque.push_back(o); }
+        else { deque.push_back(deque.back()); }
 
 		deque.pop_front();
     }
 }
-
-
 
 float Track::getVectorScale(float v1, float v2)
 {

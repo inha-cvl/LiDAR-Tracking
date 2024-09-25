@@ -2,7 +2,7 @@
 
 <arg name="lidar_topic" default="/lidar_points"/>
 <arg name="lidar_frame" default="hesai_lidar"/>
-<arg name="imu_topic" default="/ublox/imu_meas"/>
+<arg name="imu_topic" default="/imu/data_raw"/>
 <arg name="target_frame" default="ego_car"/>
 <arg name="world_frame" default="world"/>
 

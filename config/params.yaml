@@ -1,5 +1,5 @@
 Public:
-  map: "/map/solchan.json"
+  map: "/map/kiapi.json"
 
 Cloud_Segmentation:
   lidar_settings:
