@@ -273,14 +273,7 @@ void Tracking::correctionBboxRelativeSpeed(const jsk_recognition_msgs::BoundingB
             corrected_box.pose.position.x += delta_x; // x 방향으로 이동
             corrected_box.pose.position.y += delta_y; // y 방향으로 이동
         }
-
-        // std::cout << cos(yaw) << std::endl;
-        // std::cout << sin(yaw) << std::endl;
-        // std::cout << delta_x << std::endl;
-        // std::cout << delta_y << std::endl;
-        // std::cout << delta_time << std::endl;
-        // std::cout << "--------------------" << std::endl;
-
+        
         output_bbox_array.boxes.push_back(corrected_box);
     }
 

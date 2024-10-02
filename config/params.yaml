@@ -42,7 +42,7 @@ Cloud_Segmentation:
     max:
       x: 150.0
       y: 40.0
-      z: -0.3
+      z: -0.0
     min:
       x: -80.0
       y: -40.0

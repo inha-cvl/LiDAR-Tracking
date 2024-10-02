@@ -1,5 +1,5 @@
-integration : 1.12057e-05
+integration : 0
 crophdmap : 0
-tracking : 0.000498417
+tracking : 0
 transform : 0
-correction : 4.92482e-06
+correction : 0
