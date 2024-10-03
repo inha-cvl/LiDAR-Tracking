@@ -24,7 +24,7 @@ struct trackingStruct
 	jsk_recognition_msgs::BoundingBox cur_bbox;
 	jsk_recognition_msgs::BoundingBox pre_bbox;
 
-	float vx, vy, v;
+	float vx, vy, v, ax, ay;
 	std::deque<float> v_deque, vx_deque, vy_deque;
 	std::deque<float> orientation_deque;
 	double sec;
@@ -56,7 +56,7 @@ private:
 
 	float m_thres_associationCost;
 
-	float dt;
+	float dt = 0.05;
 	
 	// Global variables
 	vector<trackingStruct> vecTracks;

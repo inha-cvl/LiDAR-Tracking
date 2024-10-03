@@ -6,8 +6,8 @@ using namespace cv;
 //constructor
 Track::Track()
 {
-	stateVariableDim = 4; // cx, cy, dx, dy
-	stateMeasureDim = 2;  // cx, cy
+	stateVariableDim = 6; // cx, cy, dx, dy
+	stateMeasureDim = 2;
 	nextID = 0;
 	m_thres_invisibleCnt = 6;
 	n_velocity_deque = 6;
@@ -18,26 +18,31 @@ Track::Track()
 	//A & Q ==> Predict process
 	//H & R ==> Estimation process
 	
-	// dt = 0.05; // 0.01
+	// A 상태
+	m_matTransition = Mat::eye(stateVariableDim, stateVariableDim, CV_32F);
+	m_matTransition.at<float>(0, 2) = dt;
+	m_matTransition.at<float>(1, 3) = dt;
+	m_matTransition.at<float>(0, 4) = 0.5f * dt * dt;
+	m_matTransition.at<float>(1, 5) = 0.5f * dt * dt;
+	m_matTransition.at<float>(2, 4) = dt;
+	m_matTransition.at<float>(3, 5) = dt;
 
-	// A
-	m_matTransition = (Mat_<float>(stateVariableDim, stateVariableDim) << 1, 0, dt, 0,
-																		  0, 1, 0, dt,
-																		  0, 0, 1, 0,
-																		  0, 0, 0, 1);
+	// H 관측
+	m_matMeasurement = Mat::zeros(stateMeasureDim, stateVariableDim, CV_32F);
+	m_matMeasurement.at<float>(0, 0) = 1.0f; // x
+	m_matMeasurement.at<float>(1, 1) = 1.0f; // y
+	m_matMeasurement.at<float>(2, 2) = 1.0f; // vx
+	m_matMeasurement.at<float>(3, 3) = 1.0f; // vy
 
-	// H
-	m_matMeasurement = (Mat_<float>(stateMeasureDim, stateVariableDim) << 1, 0, 0, 0,
-																		  0, 1, 0, 0);
-
-	// Q size small -> smooth
-	// float Q[] = {1e-5f, 1e-3f, 1e-3f, 1e-3f};
-	float Q[] = {1e-2f, 1e-2f, 1e-2f, 1e-2f};
+	// Q size small -> smooth 프로세스 노이즈
+	// float Q[] = {1e-3f, 1e-3f, 1e-3f, 1e-3f, 1e-1f, 1e-1f};
+	float Q[] = {1e-1f, 1e-1f, 1e1f, 1e1f, 1e2f, 1e2f};
 	Mat tempQ(stateVariableDim, 1, CV_32FC1, Q);
 	m_matProcessNoiseCov = Mat::diag(tempQ);
 
-	// R
-	float R[] = {1e-3f, 1e-3f};
+	// R 관측 노이즈
+	// float R[] = {1e-3f, 1e-3f};
+	float R[] = {1e0f, 1e0f, 1e1f, 1e1f};
 	Mat tempR(stateMeasureDim, 1, CV_32FC1, R);
 	m_matMeasureNoiseCov = Mat::diag(tempR);
 
@@ -51,8 +56,12 @@ void Track::velocity_push_back(std::deque<float> &deque, float v)
 {
 	if (deque.size() < n_velocity_deque) { deque.push_back(v); }
 	else { // 제로백 5초 기준 가속도는 5.556m/(s*)
-		if (abs(deque.back() - v) < thr_velocity) { deque.push_back(v); }
-		else { deque.push_back(0.0); }
+		float sum_vel = 0.0;
+        for (size_t i = 0; i < deque.size(); ++i) { sum_vel += deque[i]; }
+        float avg_vel = sum_vel / deque.size();
+		
+		if (abs(avg_vel - v) < thr_velocity) { deque.push_back(v); }
+		else { deque.push_back(deque.back()); }
 		deque.pop_front(); }
 }
 
@@ -142,17 +151,26 @@ void Track::predictNewLocationOfTracks(const ros::Time &currentTime)
 	{
 		dt = currentTime.toSec() - vecTracks[i].lastTime;
 
-		vecTracks[i].kf.transitionMatrix.at<float>(0, 2) = dt;
+        // 상태 전이 행렬 업데이트
+        vecTracks[i].kf.transitionMatrix = Mat::eye(stateVariableDim, stateVariableDim, CV_32F);
+        vecTracks[i].kf.transitionMatrix.at<float>(0, 2) = dt;
         vecTracks[i].kf.transitionMatrix.at<float>(1, 3) = dt;
+        vecTracks[i].kf.transitionMatrix.at<float>(0, 4) = 0.5f * dt * dt;
+        vecTracks[i].kf.transitionMatrix.at<float>(1, 5) = 0.5f * dt * dt;
+        vecTracks[i].kf.transitionMatrix.at<float>(2, 4) = dt;
+        vecTracks[i].kf.transitionMatrix.at<float>(3, 5) = dt;
 
-		// Predict current state
-		vecTracks[i].kf.predict();
+        // 상태 예측
+        vecTracks[i].kf.predict();
 
-		vecTracks[i].cur_bbox.pose.position.x = vecTracks[i].kf.statePre.at<float>(0);
-		vecTracks[i].cur_bbox.pose.position.y = vecTracks[i].kf.statePre.at<float>(1);
+        // 예측된 위치와 속도 업데이트
+        vecTracks[i].cur_bbox.pose.position.x = vecTracks[i].kf.statePre.at<float>(0);
+        vecTracks[i].cur_bbox.pose.position.y = vecTracks[i].kf.statePre.at<float>(1);
 
-		vecTracks[i].vx = vecTracks[i].kf.statePre.at<float>(2);
-		vecTracks[i].vy = vecTracks[i].kf.statePre.at<float>(3);
+        vecTracks[i].vx = vecTracks[i].kf.statePre.at<float>(2);
+        vecTracks[i].vy = vecTracks[i].kf.statePre.at<float>(3);
+        vecTracks[i].ax = vecTracks[i].kf.statePre.at<float>(4);
+        vecTracks[i].ay = vecTracks[i].kf.statePre.at<float>(5);
 	}
 }
 
@@ -220,25 +238,48 @@ void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &b
 		int idT = vecAssignments[i].first;
 		int idD = vecAssignments[i].second;
 
-		Mat measure = Mat::zeros(stateMeasureDim, 1, CV_32FC1);
-		measure.at<float>(0) = bboxArray.boxes[idD].pose.position.x;
-		measure.at<float>(1) = bboxArray.boxes[idD].pose.position.y;
-		vecTracks[idT].kf.correct(measure);
-		
-		velocity_push_back(vecTracks[idT].vx_deque, vecTracks[idT].kf.statePost.at<float>(2));
-		velocity_push_back(vecTracks[idT].vy_deque, vecTracks[idT].kf.statePost.at<float>(3));
-		velocity_push_back(vecTracks[idT].v_deque, getVectorScale(vecTracks[idT].kf.statePost.at<float>(2), vecTracks[idT].kf.statePost.at<float>(3)));
-		// velocity_push_back(vecTracks[idT].v_deque, std::hypot(vecTracks[idT].kf.statePost.at<float>(2), vecTracks[idT].kf.statePost.at<float>(3)));
-		vecTracks[idT].vx = std::accumulate(vecTracks[idT].vx_deque.begin(), vecTracks[idT].vx_deque.end(), 0.0) / vecTracks[idT].vx_deque.size();
-		vecTracks[idT].vy = std::accumulate(vecTracks[idT].vy_deque.begin(), vecTracks[idT].vy_deque.end(), 0.0) / vecTracks[idT].vy_deque.size();
-		vecTracks[idT].v = std::accumulate(vecTracks[idT].v_deque.begin(), vecTracks[idT].v_deque.end(), 0.0) / vecTracks[idT].v_deque.size();
+		// 현재 위치
+        float meas_x = bboxArray.boxes[idD].pose.position.x;
+        float meas_y = bboxArray.boxes[idD].pose.position.y;
+
+        // 이전 위치
+        float prev_x = vecTracks[idT].pre_bbox.pose.position.x;
+        float prev_y = vecTracks[idT].pre_bbox.pose.position.y;
+
+        // 위치 변화로부터 속도 계산
+        float vx = (meas_x - prev_x) / dt;
+        float vy = (meas_y - prev_y) / dt;
+
+        // 측정값 구성 (위치와 속도 포함)
+        Mat measure = Mat::zeros(stateMeasureDim, 1, CV_32FC1);
+        measure.at<float>(0) = meas_x;
+        measure.at<float>(1) = meas_y;
+        measure.at<float>(2) = vx;
+        measure.at<float>(3) = vy;
+
+        // 칼만 필터 보정
+        vecTracks[idT].kf.correct(measure);
+
+		// 속도 deque 업데이트 및 평균 계산
+        velocity_push_back(vecTracks[idT].vx_deque, vx);
+        velocity_push_back(vecTracks[idT].vy_deque, vy);
+        vecTracks[idT].vx = std::accumulate(vecTracks[idT].vx_deque.begin(), vecTracks[idT].vx_deque.end(), 0.0f) / vecTracks[idT].vx_deque.size();
+        vecTracks[idT].vy = std::accumulate(vecTracks[idT].vy_deque.begin(), vecTracks[idT].vy_deque.end(), 0.0f) / vecTracks[idT].vy_deque.size();
+
+		// vecTracks[idT].vx = vecTracks[idT].kf.statePost.at<float>(2);
+		// vecTracks[idT].vy = vecTracks[idT].kf.statePost.at<float>(3);
+
+		vecTracks[idT].ax = vecTracks[idT].kf.statePost.at<float>(4);
+        vecTracks[idT].ay = vecTracks[idT].kf.statePost.at<float>(5);
+
+        vecTracks[idT].v = getVectorScale(vecTracks[idT].vx, vecTracks[idT].vy);
 
 		// 이전 orientation들과 비교
         orientation_push_back(vecTracks[idT].orientation_deque, tf::getYaw(bboxArray.boxes[idD].pose.orientation));
 		vecTracks[idT].cur_bbox.pose.orientation = tf::createQuaternionMsgFromYaw(vecTracks[idT].orientation_deque.back());
 
 		// 0.5초 이상 추적 된 객체가 딥러닝 기반일 시, 딥러닝 정보를 우선적으로 사용
-		if (bboxArray.boxes[idD].label == 0 && vecTracks[idT].pre_bbox.label != 0 && vecTracks[idT].age > 10) {
+		if (bboxArray.boxes[idD].label == 0 && vecTracks[idT].pre_bbox.label != 0 && vecTracks[idT].age > m_thres_invisibleCnt) {
 			vecTracks[idT].cur_bbox.dimensions = vecTracks[idT].pre_bbox.dimensions;
 			vecTracks[idT].cur_bbox.pose.orientation = vecTracks[idT].pre_bbox.pose.orientation; 
 			vecTracks[idT].cur_bbox.label = vecTracks[idT].pre_bbox.label; }
@@ -306,6 +347,9 @@ void Track::createNewTracks(const jsk_recognition_msgs::BoundingBoxArray &bboxAr
 		ts.vy = 0.0;
 		ts.v = 0.0;
 		ts.sec = 0.0;
+		ts.ax = 0.0f; // 가속도 초기화
+        ts.ay = 0.0f;
+
 
 		ts.kf.init(stateVariableDim, stateMeasureDim);
 
@@ -316,12 +360,20 @@ void Track::createNewTracks(const jsk_recognition_msgs::BoundingBoxArray &bboxAr
 		m_matMeasureNoiseCov.copyTo(ts.kf.measurementNoiseCov); //R
 
 		Mat tempCov(stateVariableDim, 1, CV_32FC1, 1);
+		tempCov.at<float>(0) = 1e-2f; // x 위치 불확실성
+		tempCov.at<float>(1) = 1e-2f; // y 위치 불확실성
+		tempCov.at<float>(2) = 1e0f;  // vx 속도 불확실성
+		tempCov.at<float>(3) = 1e0f;  // vy 속도 불확실성
+		tempCov.at<float>(4) = 1e3f;  // ax 가속도 불확실성
+		tempCov.at<float>(5) = 1e3f;  // ay 가속도 불확실성
 		ts.kf.errorCovPost = Mat::diag(tempCov);
 
 		ts.kf.statePost.at<float>(0) = ts.cur_bbox.pose.position.x;
 		ts.kf.statePost.at<float>(1) = ts.cur_bbox.pose.position.y;
 		ts.kf.statePost.at<float>(2) = ts.vx;
 		ts.kf.statePost.at<float>(3) = ts.vy;
+		ts.kf.statePost.at<float>(4) = ts.ax; // ax
+        ts.kf.statePost.at<float>(5) = ts.ay; // ay
 
 		ts.lastTime = bboxArray.boxes[id].header.stamp.toSec();
 		
@@ -339,10 +391,6 @@ pair<jsk_recognition_msgs::BoundingBoxArray, visualization_msgs::MarkerArray> Tr
 		vecTracks[i].cur_bbox.header.seq = vecTracks[i].age; // header.seq를 tracking object의 age로 사용
 		if (vecTracks[i].age >= 2 && vecTracks[i].cntConsecutiveInvisible == 0)
 		{
-			// float interpolation_time = ros::Time::now().toSec() - vecTracks[i].sec; // mingu
-			// vecTracks[i].cur_bbox.pose.position.x += vecTracks[i].vx * interpolation_time;
-			// vecTracks[i].cur_bbox.pose.position.y += vecTracks[i].vy * interpolation_time;
-
 			vecTracks[i].cur_bbox.value = vecTracks[i].v;
 			bboxArray.boxes.push_back(vecTracks[i].cur_bbox);
 			textArray.markers.push_back(get_text_msg(vecTracks[i], i));
