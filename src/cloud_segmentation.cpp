@@ -67,11 +67,11 @@ void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
     CloudSegmentation_->undistortPointCloud(nonGroundCloud, undistortionCloud, t5);
     pub_undistortion_cloud.publish(cloud2msg(undistortionCloud, input_stamp, lidar_frame));
 
-    CloudSegmentation_->downsamplingPointCloud(undistortionCloud, downsamplingCloud, t6);
+    // CloudSegmentation_->downsamplingPointCloud(undistortionCloud, downsamplingCloud, t6);
     // pub_downsampling_cloud.publish(cloud2msg(downsamplingCloud, input_stamp, lidar_frame));
 
-    CloudSegmentation_->adaptiveClustering(downsamplingCloud, cluster_array, t7);
-    // CloudSegmentation_->adaptiveVoxelClustering(undistortionCloud, cluster_array, t7);
+    // CloudSegmentation_->adaptiveClustering(downsamplingCloud, cluster_array, t7);
+    CloudSegmentation_->adaptiveVoxelClustering(undistortionCloud, cluster_array, t7);
     // pub_cluster_array.publish(cluster2msg(cluster_array, input_stamp, lidar_frame));
     CloudSegmentation_->fittingLShape(cluster_array, lidar_frame, cluster_bbox_array, t8);
     pub_cluster_box.publish(bba2msg(cluster_bbox_array, input_stamp, lidar_frame));

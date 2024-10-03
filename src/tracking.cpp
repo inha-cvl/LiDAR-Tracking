@@ -31,10 +31,18 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
     if (bba_msg->boxes.empty()) { return; }
 
     cluster_bbox_array = *bba_msg;
+    
+}
 
-    Tracking_->integrationBbox(cluster_bbox_array, deep_bbox_array, integration_bbox_array, t9);
-    Tracking_->cropHDMapBbox(integration_bbox_array, filtered_bbox_array, bba_msg->header.stamp, tf_buffer, target_frame, world_frame, t10);
-    Tracking_->tracking(filtered_bbox_array, track_bbox_array, track_text_array, bba_msg->header.stamp, t11);
+void callbackDeep(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
+{
+    if (bba_msg->boxes.empty()) { return; }
+
+    deep_bbox_array = *bba_msg;
+
+    // Tracking_->integrationBbox(cluster_bbox_array, deep_bbox_array, integration_bbox_array, t9);
+    // Tracking_->cropHDMapBbox(integration_bbox_array, filtered_bbox_array, bba_msg->header.stamp, tf_buffer, target_frame, world_frame, t10);
+    Tracking_->tracking(deep_bbox_array, track_bbox_array, track_text_array, bba_msg->header.stamp, t11);
     Tracking_->correctionBboxRelativeSpeed(track_bbox_array, bba_msg->header.stamp, ros::Time::now(), corrected_bbox_array, t12);
     
     if (checkTransform(tf_buffer, lidar_frame, target_frame)) {
@@ -60,13 +68,7 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
     std::cout << "transform : " << t13 << "sec" << std::endl;
     std::cout << "total : " << total << " sec" << std::endl;
     std::cout << "fixed frame : " << fixed_frame << std::endl;
-}
 
-void callbackDeep(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
-{
-    if (bba_msg->boxes.empty()) { return; }
-
-    deep_bbox_array = *bba_msg;
 }
 
 int main(int argc, char** argv)

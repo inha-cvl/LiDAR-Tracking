@@ -32,21 +32,21 @@ Cloud_Segmentation:
       max_tolerance: 1.2
       max_region_distance: 150
       number_region: 10
-      min_leaf_size: 0.2 # no use
-      max_leaf_size: 0.4 # no use
+      min_leaf_size: 0.2
+      max_leaf_size: 0.4
       thresh_iou: 0.3
     L_shape_fitting:
       projection_range: 0.2
 
   crop:
     max:
-      x: 100.0
+      x: 120.0
       y: 40.0
-      z: -0.0
+      z: 0.1
     min:
       x: -80.0
       y: -40.0
-      z: -1.7
+      z: -1.6
     crop_ring:
       enabled: false
       ring: 2
