@@ -227,8 +227,8 @@ void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &b
 		
 		velocity_push_back(vecTracks[idT].vx_deque, vecTracks[idT].kf.statePost.at<float>(2));
 		velocity_push_back(vecTracks[idT].vy_deque, vecTracks[idT].kf.statePost.at<float>(3));
-		// velocity_push_back(vecTracks[idT].v_deque, getVectorScale(vecTracks[idT].kf.statePost.at<float>(2), vecTracks[idT].kf.statePost.at<float>(3)));
-		velocity_push_back(vecTracks[idT].v_deque, std::hypot(vecTracks[idT].kf.statePost.at<float>(2), vecTracks[idT].kf.statePost.at<float>(3)));
+		velocity_push_back(vecTracks[idT].v_deque, getVectorScale(vecTracks[idT].kf.statePost.at<float>(2), vecTracks[idT].kf.statePost.at<float>(3)));
+		// velocity_push_back(vecTracks[idT].v_deque, std::hypot(vecTracks[idT].kf.statePost.at<float>(2), vecTracks[idT].kf.statePost.at<float>(3)));
 		vecTracks[idT].vx = std::accumulate(vecTracks[idT].vx_deque.begin(), vecTracks[idT].vx_deque.end(), 0.0) / vecTracks[idT].vx_deque.size();
 		vecTracks[idT].vy = std::accumulate(vecTracks[idT].vy_deque.begin(), vecTracks[idT].vy_deque.end(), 0.0) / vecTracks[idT].vy_deque.size();
 		vecTracks[idT].v = std::accumulate(vecTracks[idT].v_deque.begin(), vecTracks[idT].v_deque.end(), 0.0) / vecTracks[idT].v_deque.size();

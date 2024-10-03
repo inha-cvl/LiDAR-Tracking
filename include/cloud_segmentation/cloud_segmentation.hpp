@@ -10,6 +10,9 @@ public:
 
     CloudSegmentation(ros::NodeHandle& nh) : nh_(nh) {
         nh_.getParam("Public/map", map);
+        nh_.getParam("Public/lidar_frame", lidar_frame);
+        nh_.getParam("Public/target_frame", target_frame);
+        nh_.getParam("Public/world_frame", world_frame);
         nh_.getParam("Cloud_Segmentation/lidar_settings/V_SCAN", V_SCAN);
         nh_.getParam("Cloud_Segmentation/lidar_settings/H_SCAN", H_SCAN);
         nh_.getParam("Cloud_Segmentation/lidar_settings/ang_res_x", ang_res_x);
@@ -85,13 +88,13 @@ public:
     void convertPointCloudToImage(const pcl::PointCloud<PointT>& cloudIn, cv::Mat &imageOut, double &time_taken);
     void cropPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double &time_taken);
     void cropHDMapPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, 
-                    tf2_ros::Buffer &tf_buffer, const std::string target_frame, const std::string world_frame, double &time_taken);
+                            tf2_ros::Buffer &tf_buffer, double &time_taken);
     void removalGroundPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double &time_taken);
     void undistortPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double &time_taken);
     void downsamplingPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<ClusterPointT>& cloudOut, double &time_taken);
     void adaptiveClustering(const pcl::PointCloud<ClusterPointT>& cloudIn, std::vector<pcl::PointCloud<ClusterPointT>>& outputClusters, double &time_taken);
     void voxelClustering(const pcl::PointCloud<PointT>& cloudIn, std::vector<pcl::PointCloud<ClusterPointT>>& outputClusters, double& time_taken);
-    void fittingLShape(const std::vector<pcl::PointCloud<ClusterPointT>>& inputClusters, const std::string lidar_frame,
+    void fittingLShape(const std::vector<pcl::PointCloud<ClusterPointT>>& inputClusters,
                         jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken);
 
     // TODO
@@ -103,6 +106,9 @@ public:
 private:
     ros::NodeHandle nh_;
     std::string map;
+    std::string lidar_frame;
+    std::string target_frame;
+    std::string world_frame;
     std::vector<std::pair<float, float>> global_path;
     int V_SCAN; // Vertical scan lines
     int H_SCAN; // Horizontal scan points per line
@@ -330,104 +336,10 @@ void CloudSegmentation<PointT>::cropPointCloud(const pcl::PointCloud<PointT>& cl
     time_taken = elapsed_seconds.count();
     saveTimeToFile(crop_time_log_path, time_taken);
 }
-/*
-template<typename PointT> inline
-void CloudSegmentation<PointT>::cropPointCloudHDMap(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, 
-                    tf2_ros::Buffer &tf_buffer, const std::string target_frame, const std::string world_frame, 
-                    const std::vector<std::pair<float, float>> &global_path, double &time_taken)
-{
-    auto start = std::chrono::steady_clock::now();
 
-    if (cloudIn.points.empty()) {
-        std::cerr << "Input cloud is empty! <- cropPointCloudHDMap" << std::endl;
-        return;
-    }
-
-    cloudOut.clear();
-    cloudOut.reserve(cloudIn.size());
-
-    pcl::KdTreeFLANN<PointT> kdtree;
-
-    //kdtree.setInputCloud(cloudIn);
-    kdtree.setInputCloud(boost::make_shared<const pcl::PointCloud<PointT>>(cloudIn));
-
-    geometry_msgs::TransformStamped transformStamped;
-    try {
-        transformStamped = tf_buffer.lookupTransform(world_frame, target_frame, ros::Time(0)); // cur_stamp
-    } catch (tf2::TransformException &ex) {
-        // ROS_WARN("%s", ex.what());
-        cloudOut = cloudIn;
-        return;
-    }
-
-    double ego_x = transformStamped.transform.translation.x;
-    double ego_y = transformStamped.transform.translation.y;
-    tf2::Quaternion q(transformStamped.transform.rotation.x, 
-                        transformStamped.transform.rotation.y,
-                        transformStamped.transform.rotation.z, 
-                        transformStamped.transform.rotation.w);
-
-    tf2::Matrix3x3 m(q);
-    double roll, pitch, yaw;
-    m.getRPY(roll, pitch, yaw);
-
-    double min_dis = 1000;
-    int min_idx = 0;
-
-    int path_len = global_path.size();
-    
-    for (int i = 0; i < path_len; ++i) {
-        double dis = std::hypot(global_path[i].first - ego_x, global_path[i].second - ego_y);
-        if (min_dis > dis) { min_dis = dis; min_idx = i; }
-    }
-
-    int curr_index = min_idx;
-    double relative_node_x, relative_node_y;
-    
-    std::vector<int> indices;
-    for (int k = 0; k < 180; ++k) {
-        indices.push_back((curr_index + path_len + k - 80) % path_len);
-    }
-    
-    for (int idx : indices){
-        if (idx%2==0){
-
-            double dx = global_path[idx].first - ego_x;
-            double dy = global_path[idx].second - ego_y;
-
-            double cos_heading = std::cos(yaw);
-            double sin_heading = std::sin(yaw);
-
-            relative_node_x = cos_heading * dx + sin_heading * dy;
-            relative_node_y = -sin_heading * dx + cos_heading * dy;
-
-            PointT query;
-            query.x = static_cast<float>(relative_node_x);
-            query.y = static_cast<float>(relative_node_y);
-            query.z = 0.0f;
-
-            std::vector<int> idxes;
-            std::vector<float> sqr_dists;
-
-            idxes.clear();
-            sqr_dists.clear();
-            
-            kdtree.radiusSearch(query, crop_hd_map_radius, idxes, sqr_dists);
-            
-            for (const auto& idx : idxes) {
-                cloudOut.points.push_back(cloudIn.points[idx]);
-            }
-        }
-    }
-
-    auto end = std::chrono::steady_clock::now();
-    std::chrono::duration<double> elapsed_seconds = end - start;
-    time_taken = elapsed_seconds.count();
-}
-*/
 template<typename PointT> inline
 void CloudSegmentation<PointT>::cropHDMapPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, 
-                    tf2_ros::Buffer &tf_buffer, const std::string target_frame, const std::string world_frame, double &time_taken)
+                                                    tf2_ros::Buffer &tf_buffer, double &time_taken)
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -595,77 +507,6 @@ void CloudSegmentation<PointT>::undistortPointCloud(const pcl::PointCloud<PointT
     saveTimeToFile(undistortion_time_log_path, time_taken);
 }
 
-/*
-template<typename PointT> inline
-void CloudSegmentation<PointT>::undistortPointCloud(const pcl::PointCloud<PointT>& cloudIn, 
-                                                    pcl::PointCloud<PointT>& cloudOut, double &time_taken)
-{
-    auto start_time = std::chrono::steady_clock::now();
-
-    if (cloudIn.points.empty()) {
-        std::cerr << "Input cloud is empty! <- undistortPointCloud" << std::endl;
-        return;
-    }
-
-    // 회전 값이 존재하지 않으면 바로 리턴
-    if (gyr_int_.GetRot().matrix().isApprox(Eigen::Matrix3d::Identity())) {
-        std::cerr << "Input rotation is empty! <- undistortPointCloud" << std::endl;
-        cloudOut = cloudIn;
-        return;
-    }
-
-    // IMU와 LiDAR 간의 변환 행렬 T_i_l을 이용해 보정할 최종 회전 및 변환 행렬 생성
-    Sophus::SE3d T_l_c(gyr_int_.GetRot(), Eigen::Vector3d::Zero());  // 현재 IMU 회전만 고려
-    Sophus::SE3d T_l_be = T_i_l.inverse() * T_l_c * T_i_l;  // LiDAR 좌표계에서 IMU 좌표계로 변환 적용
-
-    // 회전과 변환 정보 추출
-    const Eigen::Vector3d &tbe = T_l_be.translation();
-    Eigen::Vector3d rso3_be = T_l_be.so3().log();
-
-    double diff_x = std::abs(rso3_be.x() - prev_rso3_be.x());
-    double diff_y = std::abs(rso3_be.y() - prev_rso3_be.y());
-    // std::cout << "rso3_be (rotation vector): (" << rso3_be.x() << ", " << rso3_be.y() << ", " << rso3_be.z() << ")\n";
-    if (diff_x > 0.001 || diff_y > 0.001) {
-        rso3_be = (prev_rso3_be + rso3_be) / 2.0;
-    }
-
-    // 각 포인트에 대해 회전 및 변환 적용
-    cloudOut.clear();
-    cloudOut.reserve(cloudIn.size());
-
-    for (const auto &pt : cloudIn.points) {
-        // 포인트의 시간 차이 계산
-        double dt_bi = pt.timestamp - pre_stamp.toSec();
-        if (dt_bi == 0) continue;
-
-        double ratio_bi = dt_bi / dt_l_c_;
-        double ratio_ie = 1 - ratio_bi;
-
-        // IMU 회전을 LiDAR 프레임으로 보정
-        Eigen::Vector3d rso3_ie = ratio_ie * rso3_be;
-        Sophus::SO3d Rie = Sophus::SO3d::exp(rso3_ie);
-
-        // 보정된 회전과 변환 적용: P_compensate = R_ei * Pi + t_ei
-        Eigen::Vector3d tie = ratio_ie * tbe;
-        Eigen::Vector3d pt_vec(pt.x, pt.y, pt.z);
-        Eigen::Vector3d pt_compensated = Rie.inverse() * (pt_vec - tie);
-
-        // 보정된 포인트 업데이트
-        PointT new_point = pt;
-        new_point.x = pt_compensated.x();
-        new_point.y = pt_compensated.y();
-        new_point.z = pt_compensated.z();
-        cloudOut.points.push_back(new_point);
-    }
-
-    Eigen::Vector3d prev_rso3_be = rso3_be;
-
-    auto end_time = std::chrono::steady_clock::now();
-    std::chrono::duration<double> elapsed_seconds = end_time - start_time;
-    time_taken = elapsed_seconds.count();
-}
-*/
-
 template<typename PointT> inline
 void CloudSegmentation<PointT>::downsamplingPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<ClusterPointT>& cloudOut, double& time_taken) 
 {
@@ -775,7 +616,6 @@ void CloudSegmentation<PointT>::adaptiveClustering(const pcl::PointCloud<Cluster
     saveTimeToFile(clustering_time_log_path, time_taken);
 }
 
-
 // TODO: if need
 template<typename PointT> inline
 void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<PointT>& cloudIn, 
@@ -819,8 +659,7 @@ void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<Po
         }
     }
 
-    // Iterate over each region and apply voxel grid filtering and clustering
-    // #pragma omp parallel for 
+    // Iterate over each region and apply voxel grid filtering and clustering 
     for (int i = 0; i <= number_region; i++) {
         if (indices_array[i].empty()) continue;
 
@@ -871,7 +710,6 @@ void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<Po
             double clusterSizeY = maxPt.y - minPt.y;
             double clusterSizeZ = maxPt.z - minPt.z;
 
-            // #pragma omp critical
             if (clusterSizeX > filter_min_size_x && clusterSizeX < filter_max_size_x &&
                 clusterSizeY > filter_min_size_y && clusterSizeY < filter_max_size_y &&
                 clusterSizeZ > filter_min_size_z && clusterSizeZ < filter_max_size_z) {
@@ -886,10 +724,9 @@ void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<Po
     saveTimeToFile(clustering_time_log_path, time_taken);
 }
 
-
 template<typename PointT> inline
 void CloudSegmentation<PointT>::fittingLShape(const std::vector<pcl::PointCloud<ClusterPointT>>& inputClusters, 
-                                           const std::string lidar_frame, jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken) 
+                                           jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken) 
 {
     auto start = std::chrono::steady_clock::now();
 

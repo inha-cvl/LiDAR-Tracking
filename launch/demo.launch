@@ -13,15 +13,12 @@
     <param name="lidar_topic" value="$(arg lidar_topic)"/>
     <param name="lidar_frame" value="$(arg lidar_frame)"/>
     <param name="imu_topic" value="$(arg imu_topic)"/>
-    <param name="target_frame" value="$(arg target_frame)"/>
-    <param name="world_frame" value="$(arg world_frame)"/>
   </node>
   
   <node name="tracking" pkg="lidar_tracking" type="tracking" output="screen">
     <rosparam command="load" file="$(find lidar_tracking)/config/params.yaml" />
     <param name="lidar_frame" value="$(arg lidar_frame)"/>
     <param name="target_frame" value="$(arg target_frame)"/>
-    <param name="world_frame" value="$(arg world_frame)"/>
   </node>
   
   <!-- <node name="$(anon rviz)" pkg="rviz" type="rviz" args="-d $(find lidar_tracking)/rviz/hesai.rviz"/> -->

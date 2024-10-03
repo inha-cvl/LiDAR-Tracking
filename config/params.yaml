@@ -1,5 +1,8 @@
 Public:
   map: "/map/kiapi.json"
+  lidar_frame: "hesai_lidar"
+  target_frame: "ego_car"
+  world_frame: "world"
 
 Cloud_Segmentation:
   lidar_settings:
@@ -30,7 +33,7 @@ Cloud_Segmentation:
       max_size: 2000
       min_tolerance: 0.7
       max_tolerance: 1.2
-      max_region_distance: 150
+      max_region_distance: 100
       number_region: 10
       min_leaf_size: 0.2
       max_leaf_size: 0.4
@@ -41,12 +44,12 @@ Cloud_Segmentation:
   crop:
     max:
       x: 120.0
-      y: 40.0
-      z: 0.1
+      y: 70.0
+      z: 0.2
     min:
       x: -80.0
-      y: -40.0
-      z: -1.6
+      y: -70.0
+      z: -1.5
     crop_ring:
       enabled: false
       ring: 2
@@ -58,6 +61,7 @@ Cloud_Segmentation:
 
 Tracking:
   integration:
+    mode: 0 # 0: integration, 1: cluster, 2: deep
     thresh_iou: 0.1
   crop_hd_map:
     number_front_node: 200
@@ -70,4 +74,6 @@ Tracking:
       number_orientation: 6
       thresh_velocity:  10 # m/s
       thresh_orientation: 30 # degree
+  mission:
+    cluster_distance: 70
   

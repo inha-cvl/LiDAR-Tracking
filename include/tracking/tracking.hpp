@@ -7,6 +7,10 @@ public:
     Tracking(ros::NodeHandle& nh) : nh_(nh) {
         // ROS Parameters
         nh_.getParam("Public/map", map);
+        nh_.getParam("Public/lidar_frame", lidar_frame);
+        nh_.getParam("Public/target_frame", target_frame);
+        nh_.getParam("Public/world_frame", world_frame);
+        nh_.getParam("Tracking/integration/mode", mode);
         nh_.getParam("Tracking/integration/thresh_iou", thresh_iou);
         nh_.getParam("Tracking/crop_hd_map/number_front_node", number_front_node);
         nh_.getParam("Tracking/crop_hd_map/number_back_node", number_back_node);
@@ -17,6 +21,9 @@ public:
         nh_.getParam("Tracking/track/deque/number_orientation", number_orientation_deque);
         nh_.getParam("Tracking/track/deque/thresh_velocity", thresh_velocity);
         nh_.getParam("Tracking/track/deque/thresh_orientation", thresh_orientation);
+
+        // mission
+        nh_.getParam("Tracking/mission/cluster_distance", cluster_distance);
 
         global_path = map_reader(map.c_str());
 
@@ -40,30 +47,31 @@ public:
     
     void cropHDMapBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, 
                        jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, 
-                       const ros::Time &input_stamp, tf2_ros::Buffer &tf_buffer, const std::string target_frame, 
-                       const std::string world_frame, double &time_taken);
+                       const ros::Time &input_stamp, tf2_ros::Buffer &tf_buffer, double &time_taken);
     
-    void tracking(const jsk_recognition_msgs::BoundingBoxArray &bbox_array, 
-                  jsk_recognition_msgs::BoundingBoxArray &track_bbox_array, visualization_msgs::MarkerArray &track_text_array,
-                  const ros::Time &input_stamp, double &time_taken);
+    void tracking(const jsk_recognition_msgs::BoundingBoxArray &bbox_array, jsk_recognition_msgs::BoundingBoxArray &track_bbox_array, 
+                    visualization_msgs::MarkerArray &track_text_array, const ros::Time &input_stamp, double &time_taken);
 
-    void transformBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, const std::string &frame_id, 
-                       const std::string &target_frame, tf2_ros::Buffer &tf_buffer,
-                       jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken);
+    void transformBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, tf2_ros::Buffer &tf_buffer, 
+                        jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken);
 
     void correctionBboxRelativeSpeed(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, const ros::Time &input_stamp, 
                         const ros::Time &cur_stamp, jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double& time_taken);
 
     void correctionBboxTF(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, const ros::Time &input_stamp, 
-                        const ros::Time &cur_stamp, const std::string &target_frame, const std::string &world_frame, 
-                        tf2_ros::Buffer &tf_buffer, jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken);
+                        const ros::Time &cur_stamp, tf2_ros::Buffer &tf_buffer, 
+                        jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken);
     
     void averageTime();
 
 private:
     ros::NodeHandle nh_;
     std::string map;
+    std::string lidar_frame;
+    std::string target_frame;
+    std::string world_frame;
     std::vector<std::pair<float, float>> global_path; // Initialization is Public
+    int mode;
     float thresh_iou;    // IOU threshold for bounding box integration
     int number_front_node;
     int number_back_node;
@@ -74,6 +82,9 @@ private:
     int number_orientation_deque;
     float thresh_velocity;
     float thresh_orientation;
+
+    // mission
+    float cluster_distance;
 
     double last_timestamp_cluster;
     double last_timestamp_deep;
@@ -104,20 +115,32 @@ void Tracking::integrationBbox(jsk_recognition_msgs::BoundingBoxArray &cluster_b
     }
 
     output_bbox_array.boxes.clear();
-    for (const auto &cluster_bbox : cluster_bbox_array.boxes) {
-        bool keep_cluster_bbox = true;
-        for (const auto &deep_bbox : deep_bbox_array.boxes) {
-            double overlap = getBBoxOverlap(cluster_bbox, deep_bbox);
-            if (overlap > thresh_iou) {
-                keep_cluster_bbox = false;
-                break;
+
+    // mode
+    if (mode == 0) {
+        for (const auto &cluster_bbox : cluster_bbox_array.boxes) {
+            bool keep_cluster_bbox = true;
+            for (const auto &deep_bbox : deep_bbox_array.boxes) {
+                double overlap = getBBoxOverlap(cluster_bbox, deep_bbox);
+                if (overlap > thresh_iou) {
+                    keep_cluster_bbox = false;
+                    break;
+                }
+            }
+            if (keep_cluster_bbox) {
+                
+                // mission
+                float clusterDistance = std::sqrt(cluster_bbox.pose.position.x * cluster_bbox.pose.position.x + 
+                                                  cluster_bbox.pose.position.y * cluster_bbox.pose.position.y);
+                if (clusterDistance < cluster_distance) { continue; }
+
+                output_bbox_array.boxes.push_back(cluster_bbox);
             }
         }
-        if (keep_cluster_bbox) {
-            output_bbox_array.boxes.push_back(cluster_bbox);
-        }
-    }
-    output_bbox_array.boxes.insert(output_bbox_array.boxes.end(), deep_bbox_array.boxes.begin(), deep_bbox_array.boxes.end());
+        output_bbox_array.boxes.insert(output_bbox_array.boxes.end(), deep_bbox_array.boxes.begin(), deep_bbox_array.boxes.end());
+    } 
+    else if (mode == 1) { output_bbox_array = cluster_bbox_array; } 
+    else if (mode == 2) { output_bbox_array = deep_bbox_array; }
 
     last_timestamp_cluster = cluster_bbox_array.header.stamp.toSec();
     last_timestamp_deep = deep_bbox_array.header.stamp.toSec();
@@ -130,8 +153,7 @@ void Tracking::integrationBbox(jsk_recognition_msgs::BoundingBoxArray &cluster_b
 
 void Tracking::cropHDMapBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, 
                              jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, 
-                             const ros::Time &input_stamp, tf2_ros::Buffer &tf_buffer, const std::string target_frame, 
-                             const std::string world_frame, double& time_taken) 
+                             const ros::Time &input_stamp, tf2_ros::Buffer &tf_buffer, double& time_taken) 
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -214,9 +236,8 @@ void Tracking::tracking(const jsk_recognition_msgs::BoundingBoxArray &bbox_array
     saveTimeToFile(tracking_time_log_path, time_taken);
 }
 
-void Tracking::transformBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, const std::string &frame_id, 
-                             const std::string &target_frame, tf2_ros::Buffer &tf_buffer,
-                             jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double& time_taken) 
+void Tracking::transformBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, tf2_ros::Buffer &tf_buffer, 
+                            jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double& time_taken) 
 {
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -224,7 +245,7 @@ void Tracking::transformBbox(const jsk_recognition_msgs::BoundingBoxArray &input
 
     geometry_msgs::TransformStamped transformStamped;
     try {
-        transformStamped = tf_buffer.lookupTransform(target_frame, frame_id, ros::Time(0)); // static tf
+        transformStamped = tf_buffer.lookupTransform(target_frame, lidar_frame, ros::Time(0)); // static tf
     } catch (tf2::TransformException &ex) {
         output_bbox_array = input_bbox_array;
         return;
@@ -284,8 +305,8 @@ void Tracking::correctionBboxRelativeSpeed(const jsk_recognition_msgs::BoundingB
 }
 
 void Tracking::correctionBboxTF(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, const ros::Time &input_stamp, 
-                              const ros::Time &cur_stamp, const std::string &target_frame, const std::string &world_frame, 
-                              tf2_ros::Buffer &tf_buffer, jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double& time_taken) 
+                              const ros::Time &cur_stamp, tf2_ros::Buffer &tf_buffer, 
+                              jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double& time_taken) 
 {
     auto start = std::chrono::steady_clock::now();
 
