@@ -91,6 +91,10 @@ public:
                             tf2_ros::Buffer &tf_buffer, double &time_taken);
     void removalGroundPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double &time_taken);
     void undistortPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double &time_taken);
+    
+    // CUDA-PointPillars
+    void pcl2FloatArray(const pcl::PointCloud<PointT>& cloudIn, std::vector<float>& arrayOut, double &time_taken);
+
     void downsamplingPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<ClusterPointT>& cloudOut, double &time_taken);
     void adaptiveClustering(const pcl::PointCloud<ClusterPointT>& cloudIn, std::vector<pcl::PointCloud<ClusterPointT>>& outputClusters, double &time_taken);
     void voxelClustering(const pcl::PointCloud<PointT>& cloudIn, std::vector<pcl::PointCloud<ClusterPointT>>& outputClusters, double& time_taken);
@@ -506,6 +510,34 @@ void CloudSegmentation<PointT>::undistortPointCloud(const pcl::PointCloud<PointT
     time_taken = elapsed_seconds.count();
     saveTimeToFile(undistortion_time_log_path, time_taken);
 }
+
+// CUDA-PointPillars
+template<typename PointT> inline
+void CloudSegmentation<PointT>::pcl2FloatArray(const pcl::PointCloud<PointT>& cloudIn, std::vector<float>& arrayOut, double &time_taken)
+{
+    auto start = std::chrono::steady_clock::now();
+
+    if (cloudIn.points.empty()) {
+        std::cerr << "Input cloud is empty! <- pcl2FloatArray" << std::endl;
+        return;
+    }
+
+    size_t num_points = cloudIn.size();
+    arrayOut.resize(num_points * 4);  // 각 포인트마다 x, y, z, intensity
+
+    for (size_t i = 0; i < num_points; ++i) {
+        arrayOut[i * 4 + 0] = cloudIn.points[i].x;
+        arrayOut[i * 4 + 1] = cloudIn.points[i].y;
+        arrayOut[i * 4 + 2] = cloudIn.points[i].z;
+        arrayOut[i * 4 + 3] = cloudIn.points[i].intensity / 255.0f; // intensity 정규화
+    }
+
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end - start;
+    time_taken = elapsed_seconds.count();
+}
+
+
 
 template<typename PointT> inline
 void CloudSegmentation<PointT>::downsamplingPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<ClusterPointT>& cloudOut, double& time_taken) 

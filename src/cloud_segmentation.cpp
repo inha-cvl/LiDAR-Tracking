@@ -10,6 +10,7 @@ boost::shared_ptr<CloudSegmentation<PointType>> CloudSegmentation_;
 pcl::PointCloud<PointType> fullCloud, projectionCloud, cropCloud, groundCloud, nonGroundCloud, undistortionCloud;
 pcl::PointCloud<ClusterPointT> downsamplingCloud;
 cv::Mat projectionImage;
+std::vector<float> point_array;
 vector<pcl::PointCloud<ClusterPointT>> cluster_array;
 jsk_recognition_msgs::BoundingBoxArray cluster_bbox_array;
 
@@ -19,6 +20,7 @@ ros::Publisher pub_crop_cloud;
 ros::Publisher pub_ground;
 ros::Publisher pub_non_ground;
 ros::Publisher pub_undistortion_cloud;
+ros::Publisher pub_point_array;
 ros::Publisher pub_downsampling_cloud;
 ros::Publisher pub_cluster_array;
 ros::Publisher pub_cluster_box;
@@ -67,6 +69,9 @@ void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
     CloudSegmentation_->undistortPointCloud(nonGroundCloud, undistortionCloud, t5);
     pub_undistortion_cloud.publish(cloud2msg(undistortionCloud, input_stamp, lidar_frame));
 
+    CloudSegmentation_->pcl2FloatArray(undistortionCloud, point_array, t6);
+    pub_point_array.publish(array2msg(point_array, input_stamp, lidar_frame));
+
     // CloudSegmentation_->downsamplingPointCloud(undistortionCloud, downsamplingCloud, t6);
     // pub_downsampling_cloud.publish(cloud2msg(downsamplingCloud, input_stamp, lidar_frame));
 
@@ -108,6 +113,7 @@ int main(int argc, char**argv) {
     pub_ground      = pnh.advertise<sensor_msgs::PointCloud2>("ground", 1, true);
     pub_non_ground  = pnh.advertise<sensor_msgs::PointCloud2>("nonground", 1, true);
     pub_undistortion_cloud = pnh.advertise<sensor_msgs::PointCloud2>("undistortioncloud", 1, true);
+    pub_point_array = pnh.advertise<std_msgs::Float32MultiArray>("point_array", 1, true);
     pub_downsampling_cloud  = pnh.advertise<sensor_msgs::PointCloud2>("downsampledcloud", 1, true);
     pub_cluster_array  = pnh.advertise<sensor_msgs::PointCloud2>("cluster_array", 1, true);
     pub_cluster_box = pnh.advertise<jsk_recognition_msgs::BoundingBoxArray>("cluster_box", 1, true);

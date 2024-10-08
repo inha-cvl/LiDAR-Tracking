@@ -4,6 +4,7 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/Imu.h>
 #include <geometry_msgs/TransformStamped.h>
+#include <std_msgs/Float32MultiArray.h>
 #include <jsk_recognition_msgs/BoundingBoxArray.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <tf2_eigen/tf2_eigen.h>
@@ -54,6 +55,26 @@ sensor_msgs::ImagePtr image2msg(const cv::Mat& image, const ros::Time &stamp, co
     cv_image.encoding = "mono8"; 
     cv_image.image = image;
     return cv_image.toImageMsg();
+}
+
+std_msgs::Float32MultiArray array2msg(const std::vector<float> &array, const ros::Time &stamp, const std::string &frame_id)
+{
+    std_msgs::Float32MultiArray array_msg;
+    
+    array_msg.data = array;
+
+    // 헤더 설정 (timestamp와 frame_id 저장)
+    array_msg.layout.dim.resize(2);
+    array_msg.layout.dim[0].label = "timestamp";
+    array_msg.layout.dim[0].size = stamp.sec;
+    array_msg.layout.dim[0].stride = stamp.nsec;
+    
+    array_msg.layout.dim[1].label = frame_id;
+    array_msg.layout.dim[1].size = array.size();
+    array_msg.layout.dim[1].stride = 1;
+    array_msg.layout.data_offset = 0;
+
+    return array_msg;
 }
 
 template<typename PointT>
