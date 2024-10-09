@@ -405,17 +405,15 @@ void clearLogFile(const std::string& file_path)
 // for experiment
 void saveTimeToFile(const std::string& timing_file, double time_taken) 
 {   
-    /*
-    std::ofstream file(timing_file, std::ios::app);
+    // std::ofstream file(timing_file, std::ios::app);
 
-    if (!file.is_open()) {
-        std::cerr << "Error opening file: " << timing_file << std::endl;
-        return;
-    }
+    // if (!file.is_open()) {
+    //     std::cerr << "Error opening file: " << timing_file << std::endl;
+    //     return;
+    // }
 
-    file << time_taken << "\n";
-    file.close();
-    */
+    // file << time_taken << "\n";
+    // file.close();
 }
 
 double calculateAverageTime(const std::string& timing_file) 

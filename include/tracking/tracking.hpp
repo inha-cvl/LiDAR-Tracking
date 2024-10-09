@@ -24,12 +24,12 @@ public:
 
         // mission
         nh_.getParam("Mission/tracking/cluster_distance", cluster_distance);
-        nh_.getParam("Mission/tracking/deep_distance", deep_distance);
-        nh_.getParam("Mission/tracking/deep_score", deep_score);
+        nh_.getParam("Mission/tracking/ground_removal_distance", ground_removal_distance);
         nh_.getParam("Mission/tracking/cluster_size", cluster_size);
         nh_.getParam("Mission/tracking/cluster_ratio", cluster_ratio);
-        nh_.getParam("Mission/tracking/ground_removal_distance", ground_removal_distance);
-
+        nh_.getParam("Mission/tracking/deep_distance", deep_distance);
+        nh_.getParam("Mission/tracking/deep_score", deep_score);
+        
         global_path = map_reader(map.c_str());
 
         // integration
@@ -125,37 +125,6 @@ void Tracking::integrationBbox(jsk_recognition_msgs::BoundingBoxArray &cluster_b
     }
 
     output_bbox_array.boxes.clear();
-
-    // mission
-    /*
-    std::vector<jsk_recognition_msgs::BoundingBox> filtered_cluster_boxes;
-    for (const auto &cluster_bbox : cluster_bbox_array.boxes) {
-        float clusterDistance = std::sqrt(cluster_bbox.pose.position.x * cluster_bbox.pose.position.x + 
-                                          cluster_bbox.pose.position.y * cluster_bbox.pose.position.y);
-        if (clusterDistance < ground_removal_distance) {
-            double clusterRatio = std::min(cluster_bbox.dimensions.x, cluster_bbox.dimensions.y) /
-                                  std::max(cluster_bbox.dimensions.x, cluster_bbox.dimensions.y);
-            if (clusterRatio < cluster_ratio) { continue; }
-        }
-
-        filtered_cluster_boxes.push_back(cluster_bbox);  // 필터 통과한 박스를 추가
-    }
-    // mission
-    std::vector<jsk_recognition_msgs::BoundingBox> filtered_deep_boxes;
-    if (!deep_bbox_array.boxes.empty()) {
-        for (const auto &deep_bbox : deep_bbox_array.boxes) {
-            float deepDistance = std::sqrt(deep_bbox.pose.position.x * deep_bbox.pose.position.x + 
-                                        deep_bbox.pose.position.y * deep_bbox.pose.position.y);
-            // 특정 거리 내에 있는 경계 상자 중, score가 임계값 이상인 것만 사용
-            if (deepDistance >= deep_distance || deep_bbox.value >= deep_score) {
-                filtered_deep_boxes.push_back(deep_bbox);
-            }
-        }
-    }
-    // ?? : 원인 불명의 메모리 문제 
-    if (filtered_cluster_boxes.empty()) { cluster_bbox_array.boxes.clear(); }
-    if (filtered_deep_boxes.empty()) { deep_bbox_array.boxes.clear(); }
-    */
     
     // mission
     if (!cluster_bbox_array.boxes.empty()) {
@@ -177,8 +146,6 @@ void Tracking::integrationBbox(jsk_recognition_msgs::BoundingBoxArray &cluster_b
                 }),
             cluster_bbox_array.boxes.end());
     }
-
-    // mission
     if (!deep_bbox_array.boxes.empty()) {
         deep_bbox_array.boxes.erase(
             std::remove_if(deep_bbox_array.boxes.begin(), deep_bbox_array.boxes.end(),
@@ -192,16 +159,18 @@ void Tracking::integrationBbox(jsk_recognition_msgs::BoundingBoxArray &cluster_b
     
     if (cluster_bbox_array.boxes.empty()) { cluster_bbox_array.boxes.clear(); }
     if (deep_bbox_array.boxes.empty()) { deep_bbox_array.boxes.clear(); }
+    
 
     // mode
     if (mode == 0) {
         for (const auto &cluster_bbox : cluster_bbox_array.boxes) {
 
             // mission // cluster_distance가 70이 아니라 30이면 왜 문제가 생길까?
+            
             float clusterDistance = std::sqrt(cluster_bbox.pose.position.x * cluster_bbox.pose.position.x + 
                                               cluster_bbox.pose.position.y * cluster_bbox.pose.position.y);
             if (clusterDistance < cluster_distance) { continue; }
-
+            
             bool keep_cluster_bbox = true;
             for (const auto &deep_bbox : deep_bbox_array.boxes) {
                 double overlap = getBBoxOverlap(cluster_bbox, deep_bbox);
