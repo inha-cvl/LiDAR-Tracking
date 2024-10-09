@@ -6,7 +6,7 @@ using namespace cv;
 //constructor
 Track::Track()
 {
-	stateVariableDim = 6; // cx, cy, dx, dy
+	stateVariableDim = 4; // cx, cy, dx, dy
 	stateMeasureDim = 2;
 	nextID = 0;
 	m_thres_invisibleCnt = 6;
@@ -22,10 +22,6 @@ Track::Track()
 	m_matTransition = Mat::eye(stateVariableDim, stateVariableDim, CV_32F);
 	m_matTransition.at<float>(0, 2) = dt;
 	m_matTransition.at<float>(1, 3) = dt;
-	m_matTransition.at<float>(0, 4) = 0.5f * dt * dt;
-	m_matTransition.at<float>(1, 5) = 0.5f * dt * dt;
-	m_matTransition.at<float>(2, 4) = dt;
-	m_matTransition.at<float>(3, 5) = dt;
 
 	// H 관측
 	m_matMeasurement = Mat::zeros(stateMeasureDim, stateVariableDim, CV_32F);
@@ -35,14 +31,12 @@ Track::Track()
 	m_matMeasurement.at<float>(3, 3) = 1.0f; // vy
 
 	// Q size small -> smooth 프로세스 노이즈
-	// float Q[] = {1e-3f, 1e-3f, 1e-3f, 1e-3f, 1e-1f, 1e-1f};
-	float Q[] = {1e-1f, 1e-1f, 1e1f, 1e1f, 1e2f, 1e2f};
+	float Q[] = {1e-3f, 1e-3f, 1e-2f, 1e-2f};
 	Mat tempQ(stateVariableDim, 1, CV_32FC1, Q);
 	m_matProcessNoiseCov = Mat::diag(tempQ);
 
 	// R 관측 노이즈
-	// float R[] = {1e-3f, 1e-3f};
-	float R[] = {1e0f, 1e0f, 1e1f, 1e1f};
+	float R[] = {1e-3f, 1e-3f, 1e-2f, 1e-2f};
 	Mat tempR(stateMeasureDim, 1, CV_32FC1, R);
 	m_matMeasureNoiseCov = Mat::diag(tempR);
 
@@ -138,7 +132,8 @@ visualization_msgs::Marker Track::get_text_msg(struct trackingStruct &track, int
 	char buf[100];
 	//sprintf(buf, "ID : %d", track.id*10+1);
 	//sprintf(buf, "%f", text.pose.position.y);
-	sprintf(buf, "ID: %d\nAge: %d\nV: %dkm/h", track.id, track.age ,int(track.v*3.6));
+	// sprintf(buf, "ID: %d\nAge: %d\nV: %dkm/h", track.id, track.age ,int(track.v*3.6));
+	sprintf(buf, "Age: %d\nD: %dm\nV: %dkm/h", track.age ,int(text.pose.position.x), int(track.v*3.6));
 
 	text.text = buf;
 
@@ -155,10 +150,6 @@ void Track::predictNewLocationOfTracks(const ros::Time &currentTime)
         vecTracks[i].kf.transitionMatrix = Mat::eye(stateVariableDim, stateVariableDim, CV_32F);
         vecTracks[i].kf.transitionMatrix.at<float>(0, 2) = dt;
         vecTracks[i].kf.transitionMatrix.at<float>(1, 3) = dt;
-        vecTracks[i].kf.transitionMatrix.at<float>(0, 4) = 0.5f * dt * dt;
-        vecTracks[i].kf.transitionMatrix.at<float>(1, 5) = 0.5f * dt * dt;
-        vecTracks[i].kf.transitionMatrix.at<float>(2, 4) = dt;
-        vecTracks[i].kf.transitionMatrix.at<float>(3, 5) = dt;
 
         // 상태 예측
         vecTracks[i].kf.predict();
@@ -166,11 +157,8 @@ void Track::predictNewLocationOfTracks(const ros::Time &currentTime)
         // 예측된 위치와 속도 업데이트
         vecTracks[i].cur_bbox.pose.position.x = vecTracks[i].kf.statePre.at<float>(0);
         vecTracks[i].cur_bbox.pose.position.y = vecTracks[i].kf.statePre.at<float>(1);
-
         vecTracks[i].vx = vecTracks[i].kf.statePre.at<float>(2);
         vecTracks[i].vy = vecTracks[i].kf.statePre.at<float>(3);
-        vecTracks[i].ax = vecTracks[i].kf.statePre.at<float>(4);
-        vecTracks[i].ay = vecTracks[i].kf.statePre.at<float>(5);
 	}
 }
 
@@ -238,42 +226,30 @@ void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &b
 		int idT = vecAssignments[i].first;
 		int idD = vecAssignments[i].second;
 
-		// 현재 위치
-        float meas_x = bboxArray.boxes[idD].pose.position.x;
-        float meas_y = bboxArray.boxes[idD].pose.position.y;
-
-        // 이전 위치
-        float prev_x = vecTracks[idT].pre_bbox.pose.position.x;
-        float prev_y = vecTracks[idT].pre_bbox.pose.position.y;
-
         // 위치 변화로부터 속도 계산
-        float vx = (meas_x - prev_x) / dt;
-        float vy = (meas_y - prev_y) / dt;
-
-        // 측정값 구성 (위치와 속도 포함)
-        Mat measure = Mat::zeros(stateMeasureDim, 1, CV_32FC1);
-        measure.at<float>(0) = meas_x;
-        measure.at<float>(1) = meas_y;
-        measure.at<float>(2) = vx;
-        measure.at<float>(3) = vy;
-
-        // 칼만 필터 보정
-        vecTracks[idT].kf.correct(measure);
+        float vx = (bboxArray.boxes[idD].pose.position.x - vecTracks[idT].pre_bbox.pose.position.x) / dt;
+        float vy = (bboxArray.boxes[idD].pose.position.y - vecTracks[idT].pre_bbox.pose.position.y) / dt;
 
 		// 속도 deque 업데이트 및 평균 계산
         velocity_push_back(vecTracks[idT].vx_deque, vx);
         velocity_push_back(vecTracks[idT].vy_deque, vy);
         vecTracks[idT].vx = std::accumulate(vecTracks[idT].vx_deque.begin(), vecTracks[idT].vx_deque.end(), 0.0f) / vecTracks[idT].vx_deque.size();
         vecTracks[idT].vy = std::accumulate(vecTracks[idT].vy_deque.begin(), vecTracks[idT].vy_deque.end(), 0.0f) / vecTracks[idT].vy_deque.size();
+		
+		// 측정값 구성 (위치와 속도 포함)
+        Mat measure = Mat::zeros(stateMeasureDim, 1, CV_32FC1);
+        measure.at<float>(0) = bboxArray.boxes[idD].pose.position.x;
+        measure.at<float>(1) = bboxArray.boxes[idD].pose.position.y;
+        measure.at<float>(2) = vecTracks[idT].vx;
+        measure.at<float>(3) = vecTracks[idT].vy;
 
-		// vecTracks[idT].vx = vecTracks[idT].kf.statePost.at<float>(2);
-		// vecTracks[idT].vy = vecTracks[idT].kf.statePost.at<float>(3);
+        // 칼만 필터 보정
+        vecTracks[idT].kf.correct(measure);
 
-		vecTracks[idT].ax = vecTracks[idT].kf.statePost.at<float>(4);
-        vecTracks[idT].ay = vecTracks[idT].kf.statePost.at<float>(5);
-
-        vecTracks[idT].v = getVectorScale(vecTracks[idT].vx, vecTracks[idT].vy);
-
+		vecTracks[idT].v = getVectorScale(vecTracks[idT].kf.statePost.at<float>(2), vecTracks[idT].kf.statePost.at<float>(3)); // 1
+		// vecTracks[idT].v = getVectorScale(vecTracks[idT].vx, vecTracks[idT].vy); // 2
+		// vecTracks[idT].v = vecTracks[idT].vx; // 3
+		
 		// 이전 orientation들과 비교
         orientation_push_back(vecTracks[idT].orientation_deque, tf::getYaw(bboxArray.boxes[idD].pose.orientation));
 		vecTracks[idT].cur_bbox.pose.orientation = tf::createQuaternionMsgFromYaw(vecTracks[idT].orientation_deque.back());
@@ -293,7 +269,8 @@ void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &b
 		vecTracks[idT].cur_bbox.header.stamp = bboxArray.boxes[idD].header.stamp; // 중요, 이거 안 하면 time stamp 안 맞아서 스탬프가 오래됐을 경우 rviz에서 제대로 표시 안됨
 
 		vecTracks[idT].pre_bbox = vecTracks[idT].cur_bbox;
-		// vecTracks[idT].sec = lidarSec.toSec();
+		vecTracks[idT].cls = vecTracks[idT].cur_bbox.label;
+		vecTracks[idT].score = vecTracks[idT].cur_bbox.value;
 		vecTracks[idT].lastTime = bboxArray.boxes[idD].header.stamp.toSec();
 		vecTracks[idT].age++;
 		vecTracks[idT].cntTotalVisible++;
@@ -346,34 +323,25 @@ void Track::createNewTracks(const jsk_recognition_msgs::BoundingBoxArray &bboxAr
 		ts.vx = 0.0;
 		ts.vy = 0.0;
 		ts.v = 0.0;
-		ts.sec = 0.0;
-		ts.ax = 0.0f; // 가속도 초기화
-        ts.ay = 0.0f;
-
 
 		ts.kf.init(stateVariableDim, stateMeasureDim);
 
 		m_matTransition.copyTo(ts.kf.transitionMatrix);         //A
 		m_matMeasurement.copyTo(ts.kf.measurementMatrix);       //H
-
 		m_matProcessNoiseCov.copyTo(ts.kf.processNoiseCov);     //Q
 		m_matMeasureNoiseCov.copyTo(ts.kf.measurementNoiseCov); //R
 
 		Mat tempCov(stateVariableDim, 1, CV_32FC1, 1);
-		tempCov.at<float>(0) = 1e-2f; // x 위치 불확실성
-		tempCov.at<float>(1) = 1e-2f; // y 위치 불확실성
-		tempCov.at<float>(2) = 1e0f;  // vx 속도 불확실성
-		tempCov.at<float>(3) = 1e0f;  // vy 속도 불확실성
-		tempCov.at<float>(4) = 1e3f;  // ax 가속도 불확실성
-		tempCov.at<float>(5) = 1e3f;  // ay 가속도 불확실성
+		tempCov.at<float>(0) = 1e-3f; // x 위치 불확실성
+		tempCov.at<float>(1) = 1e-3f; // y 위치 불확실성
+		tempCov.at<float>(2) = 1e-2f;  // vx 속도 불확실성
+		tempCov.at<float>(3) = 1e-2f;  // vy 속도 불확실성
 		ts.kf.errorCovPost = Mat::diag(tempCov);
 
 		ts.kf.statePost.at<float>(0) = ts.cur_bbox.pose.position.x;
 		ts.kf.statePost.at<float>(1) = ts.cur_bbox.pose.position.y;
 		ts.kf.statePost.at<float>(2) = ts.vx;
 		ts.kf.statePost.at<float>(3) = ts.vy;
-		ts.kf.statePost.at<float>(4) = ts.ax; // ax
-        ts.kf.statePost.at<float>(5) = ts.ay; // ay
 
 		ts.lastTime = bboxArray.boxes[id].header.stamp.toSec();
 		
@@ -388,9 +356,11 @@ pair<jsk_recognition_msgs::BoundingBoxArray, visualization_msgs::MarkerArray> Tr
 	
 	for (int i = 0; i < vecTracks.size(); i++)
 	{
-		vecTracks[i].cur_bbox.header.seq = vecTracks[i].age; // header.seq를 tracking object의 age로 사용
-		if (vecTracks[i].age >= 2 && vecTracks[i].cntConsecutiveInvisible == 0)
-		{
+		
+		if ((vecTracks[i].age >= 2 && vecTracks[i].cntConsecutiveInvisible == 0))// ||
+			// (vecTracks[i].cls == 0 && vecTracks[i].age >= 10 && vecTracks[i].cntConsecutiveInvisible == 0))
+		{	
+			vecTracks[i].cur_bbox.header.seq = vecTracks[i].age; // header.seq를 tracking object의 age로 사용
 			vecTracks[i].cur_bbox.value = vecTracks[i].v;
 			bboxArray.boxes.push_back(vecTracks[i].cur_bbox);
 			textArray.markers.push_back(get_text_msg(vecTracks[i], i));

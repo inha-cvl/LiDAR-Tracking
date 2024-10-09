@@ -53,13 +53,13 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
     
     total = ros::Time::now().toSec() - cluster_bbox_array.boxes[0].header.stamp.toSec();
 
-    std::cout << "\033[" << 18 << ";" << 30 << "H" << std::endl;
-    std::cout << "integration & crophdmap : " << t9+t10 << "sec" << std::endl;
-    std::cout << "tracking : " << t11 << "sec" << std::endl;
-    std::cout << "correction : " << t12 << "sec" << std::endl;
-    std::cout << "transform : " << t13 << "sec" << std::endl;
-    std::cout << "total : " << total << " sec" << std::endl;
-    std::cout << "fixed frame : " << fixed_frame << std::endl;
+    // std::cout << "\033[" << 18 << ";" << 30 << "H" << std::endl;
+    // std::cout << "integration & crophdmap : " << t9+t10 << "sec" << std::endl;
+    // std::cout << "tracking : " << t11 << "sec" << std::endl;
+    // std::cout << "correction : " << t12 << "sec" << std::endl;
+    // std::cout << "transform : " << t13 << "sec" << std::endl;
+    // std::cout << "total : " << total << " sec" << std::endl;
+    // std::cout << "fixed frame : " << fixed_frame << std::endl;
     
 }
 

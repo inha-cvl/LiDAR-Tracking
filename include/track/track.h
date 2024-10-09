@@ -18,16 +18,17 @@ struct trackingStruct
 {
 	unsigned int id;
 	unsigned int age;
+	unsigned int cls;
+	float score;
 	unsigned cntTotalVisible;
 	unsigned cntConsecutiveInvisible;
 
 	jsk_recognition_msgs::BoundingBox cur_bbox;
 	jsk_recognition_msgs::BoundingBox pre_bbox;
 
-	float vx, vy, v, ax, ay;
-	std::deque<float> v_deque, vx_deque, vy_deque;
+	float vx, vy, v;
+	std::deque<float> vx_deque, vy_deque, v_deque;
 	std::deque<float> orientation_deque;
-	double sec;
 
 	cv::KalmanFilter kf;
 

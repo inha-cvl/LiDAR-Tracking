@@ -23,7 +23,12 @@ public:
         nh_.getParam("Tracking/track/deque/thresh_orientation", thresh_orientation);
 
         // mission
-        nh_.getParam("Tracking/mission/cluster_distance", cluster_distance);
+        nh_.getParam("Mission/tracking/cluster_distance", cluster_distance);
+        nh_.getParam("Mission/tracking/deep_distance", deep_distance);
+        nh_.getParam("Mission/tracking/deep_score", deep_score);
+        nh_.getParam("Mission/tracking/cluster_size", cluster_size);
+        nh_.getParam("Mission/tracking/cluster_ratio", cluster_ratio);
+        nh_.getParam("Mission/tracking/ground_removal_distance", ground_removal_distance);
 
         global_path = map_reader(map.c_str());
 
@@ -84,8 +89,13 @@ private:
     float thresh_orientation;
 
     // mission
-    float cluster_distance;
-
+    int cluster_distance;
+    int ground_removal_distance;
+    float cluster_size;
+    float cluster_ratio;
+    int deep_distance;
+    float deep_score;
+    
     double last_timestamp_cluster;
     double last_timestamp_deep;
 
@@ -116,9 +126,82 @@ void Tracking::integrationBbox(jsk_recognition_msgs::BoundingBoxArray &cluster_b
 
     output_bbox_array.boxes.clear();
 
+    // mission
+    /*
+    std::vector<jsk_recognition_msgs::BoundingBox> filtered_cluster_boxes;
+    for (const auto &cluster_bbox : cluster_bbox_array.boxes) {
+        float clusterDistance = std::sqrt(cluster_bbox.pose.position.x * cluster_bbox.pose.position.x + 
+                                          cluster_bbox.pose.position.y * cluster_bbox.pose.position.y);
+        if (clusterDistance < ground_removal_distance) {
+            double clusterRatio = std::min(cluster_bbox.dimensions.x, cluster_bbox.dimensions.y) /
+                                  std::max(cluster_bbox.dimensions.x, cluster_bbox.dimensions.y);
+            if (clusterRatio < cluster_ratio) { continue; }
+        }
+
+        filtered_cluster_boxes.push_back(cluster_bbox);  // 필터 통과한 박스를 추가
+    }
+    // mission
+    std::vector<jsk_recognition_msgs::BoundingBox> filtered_deep_boxes;
+    if (!deep_bbox_array.boxes.empty()) {
+        for (const auto &deep_bbox : deep_bbox_array.boxes) {
+            float deepDistance = std::sqrt(deep_bbox.pose.position.x * deep_bbox.pose.position.x + 
+                                        deep_bbox.pose.position.y * deep_bbox.pose.position.y);
+            // 특정 거리 내에 있는 경계 상자 중, score가 임계값 이상인 것만 사용
+            if (deepDistance >= deep_distance || deep_bbox.value >= deep_score) {
+                filtered_deep_boxes.push_back(deep_bbox);
+            }
+        }
+    }
+    // ?? : 원인 불명의 메모리 문제 
+    if (filtered_cluster_boxes.empty()) { cluster_bbox_array.boxes.clear(); }
+    if (filtered_deep_boxes.empty()) { deep_bbox_array.boxes.clear(); }
+    */
+    
+    // mission
+    if (!cluster_bbox_array.boxes.empty()) {
+        cluster_bbox_array.boxes.erase(
+            std::remove_if(cluster_bbox_array.boxes.begin(), cluster_bbox_array.boxes.end(),
+                [this](const jsk_recognition_msgs::BoundingBox &cluster_bbox) {
+                    float clusterDistance = std::sqrt(cluster_bbox.pose.position.x * cluster_bbox.pose.position.x + 
+                                                    cluster_bbox.pose.position.y * cluster_bbox.pose.position.y);
+                    if (clusterDistance < ground_removal_distance) {
+                        if (cluster_bbox.dimensions.x < cluster_size || 
+                            cluster_bbox.dimensions.y < cluster_size || 
+                            cluster_bbox.dimensions.z < cluster_size) { return true; }
+
+                        double clusterRatio = std::min(cluster_bbox.dimensions.x, cluster_bbox.dimensions.y) /
+                                            std::max(cluster_bbox.dimensions.x, cluster_bbox.dimensions.y);
+                        if (clusterRatio < cluster_ratio) { return true; }
+                    }
+                    return false;
+                }),
+            cluster_bbox_array.boxes.end());
+    }
+
+    // mission
+    if (!deep_bbox_array.boxes.empty()) {
+        deep_bbox_array.boxes.erase(
+            std::remove_if(deep_bbox_array.boxes.begin(), deep_bbox_array.boxes.end(),
+                [this](const jsk_recognition_msgs::BoundingBox &deep_bbox) {
+                    float deepDistance = std::sqrt(deep_bbox.pose.position.x * deep_bbox.pose.position.x + 
+                                                deep_bbox.pose.position.y * deep_bbox.pose.position.y);
+                    return (deepDistance < deep_distance && deep_bbox.value < deep_score);
+                }),
+            deep_bbox_array.boxes.end());
+    }
+    
+    if (cluster_bbox_array.boxes.empty()) { cluster_bbox_array.boxes.clear(); }
+    if (deep_bbox_array.boxes.empty()) { deep_bbox_array.boxes.clear(); }
+
     // mode
     if (mode == 0) {
         for (const auto &cluster_bbox : cluster_bbox_array.boxes) {
+
+            // mission // cluster_distance가 70이 아니라 30이면 왜 문제가 생길까?
+            float clusterDistance = std::sqrt(cluster_bbox.pose.position.x * cluster_bbox.pose.position.x + 
+                                              cluster_bbox.pose.position.y * cluster_bbox.pose.position.y);
+            if (clusterDistance < cluster_distance) { continue; }
+
             bool keep_cluster_bbox = true;
             for (const auto &deep_bbox : deep_bbox_array.boxes) {
                 double overlap = getBBoxOverlap(cluster_bbox, deep_bbox);
@@ -128,12 +211,6 @@ void Tracking::integrationBbox(jsk_recognition_msgs::BoundingBoxArray &cluster_b
                 }
             }
             if (keep_cluster_bbox) {
-                
-                // mission
-                float clusterDistance = std::sqrt(cluster_bbox.pose.position.x * cluster_bbox.pose.position.x + 
-                                                  cluster_bbox.pose.position.y * cluster_bbox.pose.position.y);
-                if (clusterDistance < cluster_distance) { continue; }
-
                 output_bbox_array.boxes.push_back(cluster_bbox);
             }
         }
@@ -210,8 +287,6 @@ void Tracking::cropHDMapBbox(const jsk_recognition_msgs::BoundingBoxArray &input
     saveTimeToFile(crophdmap_time_log_path, time_taken);
 }
 
-
-
 void Tracking::tracking(const jsk_recognition_msgs::BoundingBoxArray &bbox_array, 
                         jsk_recognition_msgs::BoundingBoxArray &track_bbox_array, visualization_msgs::MarkerArray &track_text_array,
                         const ros::Time &input_stamp, double& time_taken)
@@ -286,13 +361,16 @@ void Tracking::correctionBboxRelativeSpeed(const jsk_recognition_msgs::BoundingB
         jsk_recognition_msgs::BoundingBox corrected_box = box; // 원래 box 복사
         corrected_box.header.stamp = cur_stamp;
 
-        if (corrected_box.header.seq > 10) {
+        if (corrected_box.header.seq > invisibleCnt && corrected_box.label == 1) {
             double velocity = std::abs(box.value);
             double yaw = tf::getYaw(box.pose.orientation);
             double delta_x = velocity * delta_time * cos(yaw);
             double delta_y = velocity * delta_time * sin(yaw);
-            corrected_box.pose.position.x += delta_x; // x 방향으로 이동
-            corrected_box.pose.position.y += delta_y; // y 방향으로 이동
+            // 60km/h & 0.1sec -> 1.67m
+            if (delta_x < 1.7 && delta_y < 1.7) { 
+                corrected_box.pose.position.x += delta_x; // x 방향으로 이동
+                corrected_box.pose.position.y += delta_y; // y 방향으로 이동
+            }            
         }
         
         output_bbox_array.boxes.push_back(corrected_box);

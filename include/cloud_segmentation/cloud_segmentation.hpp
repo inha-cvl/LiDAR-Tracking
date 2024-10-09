@@ -537,8 +537,6 @@ void CloudSegmentation<PointT>::pcl2FloatArray(const pcl::PointCloud<PointT>& cl
     time_taken = elapsed_seconds.count();
 }
 
-
-
 template<typename PointT> inline
 void CloudSegmentation<PointT>::downsamplingPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<ClusterPointT>& cloudOut, double& time_taken) 
 {
@@ -648,7 +646,6 @@ void CloudSegmentation<PointT>::adaptiveClustering(const pcl::PointCloud<Cluster
     saveTimeToFile(clustering_time_log_path, time_taken);
 }
 
-// TODO: if need
 template<typename PointT> inline
 void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<PointT>& cloudIn, 
                                                      std::vector<pcl::PointCloud<ClusterPointT>>& outputClusters, 
@@ -736,17 +733,7 @@ void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<Po
             cluster.height = 1;
             cluster.is_dense = true;
 
-            ClusterPointT minPt, maxPt;
-            pcl::getMinMax3D(cluster, minPt, maxPt);
-            double clusterSizeX = maxPt.x - minPt.x;
-            double clusterSizeY = maxPt.y - minPt.y;
-            double clusterSizeZ = maxPt.z - minPt.z;
-
-            if (clusterSizeX > filter_min_size_x && clusterSizeX < filter_max_size_x &&
-                clusterSizeY > filter_min_size_y && clusterSizeY < filter_max_size_y &&
-                clusterSizeZ > filter_min_size_z && clusterSizeZ < filter_max_size_z) {
-                outputClusters.push_back(cluster);
-            }
+            outputClusters.push_back(cluster);
         }
     }
 
@@ -794,6 +781,12 @@ void CloudSegmentation<PointT>::fittingLShape(const std::vector<pcl::PointCloud<
         bbox.dimensions.z = maxPoint.z - minPoint.z;
         bbox.pose.orientation.z = std::sin(yaw / 2.0);
         bbox.pose.orientation.w = std::cos(yaw / 2.0);
+
+        if (bbox.dimensions.x < filter_min_size_x || bbox.dimensions.x > filter_max_size_x ||
+            bbox.dimensions.y < filter_min_size_y || bbox.dimensions.y > filter_max_size_y ||
+            bbox.dimensions.z < filter_min_size_z || bbox.dimensions.z > filter_max_size_z) {
+            continue;
+        }
 
         output_bbox_array.boxes.push_back(bbox);
     }

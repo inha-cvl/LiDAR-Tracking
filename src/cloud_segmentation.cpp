@@ -81,15 +81,15 @@ void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
     CloudSegmentation_->fittingLShape(cluster_array, cluster_bbox_array, t8);
     pub_cluster_box.publish(bba2msg(cluster_bbox_array, input_stamp, lidar_frame));
 
-    std::cout << "\033[2J" << "\033[" << 10 << ";" << 30 << "H" << std::endl;
-    std::cout << "projection : " << t1 << " sec" << std::endl;
-    std::cout << "converstion : " << t2 << " sec" << std::endl;
-    std::cout << "crop : " << t3 << " sec" << std::endl;
-    std::cout << "ground removal : " << t4 << " sec" << std::endl;
-    std::cout << "undistortion : " << t5 << " sec" << std::endl;
-    std::cout << "downsampling : " << t6 << " sec" << std::endl;
-    std::cout << "clustering : " << t7 << " sec" << std::endl;
-    std::cout << "lshape fitting : " << t8 << " sec" << std::endl;
+    // std::cout << "\033[2J" << "\033[" << 10 << ";" << 30 << "H" << std::endl;
+    // std::cout << "projection : " << t1 << " sec" << std::endl;
+    // std::cout << "converstion : " << t2 << " sec" << std::endl;
+    // std::cout << "crop : " << t3 << " sec" << std::endl;
+    // std::cout << "ground removal : " << t4 << " sec" << std::endl;
+    // std::cout << "undistortion : " << t5 << " sec" << std::endl;
+    // std::cout << "downsampling : " << t6 << " sec" << std::endl;
+    // std::cout << "clustering : " << t7 << " sec" << std::endl;
+    // std::cout << "lshape fitting : " << t8 << " sec" << std::endl;
 }
 
 int main(int argc, char**argv) {
