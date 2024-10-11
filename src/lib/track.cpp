@@ -12,7 +12,7 @@ Track::Track()
 	m_thres_invisibleCnt = 6;
 	n_velocity_deque = 6;
 	n_orientation_deque = 6;
-	thr_velocity = 10; // m/s
+	thr_velocity = 15; // m/s
 	thr_orientation = M_PI / 6; // 30 degree
 
 	//A & Q ==> Predict process
@@ -40,7 +40,7 @@ Track::Track()
 	Mat tempR(stateMeasureDim, 1, CV_32FC1, R);
 	m_matMeasureNoiseCov = Mat::diag(tempR);
 
-	m_thres_associationCost = 5.0f;
+	m_thres_associationCost = 3.0f;
 }
 
 //deconstructor
@@ -133,7 +133,8 @@ visualization_msgs::Marker Track::get_text_msg(struct trackingStruct &track, int
 	//sprintf(buf, "ID : %d", track.id*10+1);
 	//sprintf(buf, "%f", text.pose.position.y);
 	// sprintf(buf, "ID: %d\nAge: %d\nV: %dkm/h", track.id, track.age ,int(track.v*3.6));
-	sprintf(buf, "Age: %d\nD: %dm\nV: %dkm/h", track.age ,int(text.pose.position.x), int(track.v*3.6));
+	// sprintf(buf, "Age: %d\nD: %dm\nV: %dkm/h", track.age ,int(text.pose.position.x), int(track.v*3.6));
+	sprintf(buf, "Score: %.2f\nD: %dm\nV: %dkm/h", track.score ,int(text.pose.position.x), int(track.v*3.6));
 
 	text.text = buf;
 
@@ -246,8 +247,9 @@ void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &b
         // 칼만 필터 보정
         vecTracks[idT].kf.correct(measure);
 
-		vecTracks[idT].v = getVectorScale(vecTracks[idT].kf.statePost.at<float>(2), vecTracks[idT].kf.statePost.at<float>(3)); // 1
+		// vecTracks[idT].v = getVectorScale(vecTracks[idT].kf.statePost.at<float>(2), vecTracks[idT].kf.statePost.at<float>(3)); // 1
 		// vecTracks[idT].v = getVectorScale(vecTracks[idT].vx, vecTracks[idT].vy); // 2
+		vecTracks[idT].v = vecTracks[idT].kf.statePost.at<float>(2);
 		// vecTracks[idT].v = vecTracks[idT].vx; // 3
 		
 		// 이전 orientation들과 비교
@@ -270,7 +272,7 @@ void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &b
 
 		vecTracks[idT].pre_bbox = vecTracks[idT].cur_bbox;
 		vecTracks[idT].cls = vecTracks[idT].cur_bbox.label;
-		vecTracks[idT].score = vecTracks[idT].cur_bbox.value;
+		if (vecTracks[idT].cls != 0) { vecTracks[idT].score = bboxArray.boxes[idD].value; }
 		vecTracks[idT].lastTime = bboxArray.boxes[idD].header.stamp.toSec();
 		vecTracks[idT].age++;
 		vecTracks[idT].cntTotalVisible++;
@@ -285,6 +287,9 @@ void Track::unassignedTracksUpdate()
 		int id = vecUnassignedTracks[i];
 		vecTracks[id].age++;
 		vecTracks[id].cntConsecutiveInvisible++;
+
+		// 객체 유지
+		vecTracks[id].cur_bbox = vecTracks[id].pre_bbox;
 	}
 }
 
@@ -356,9 +361,10 @@ pair<jsk_recognition_msgs::BoundingBoxArray, visualization_msgs::MarkerArray> Tr
 	
 	for (int i = 0; i < vecTracks.size(); i++)
 	{
-		
-		if ((vecTracks[i].age >= 2 && vecTracks[i].cntConsecutiveInvisible == 0))// ||
-			// (vecTracks[i].cls == 0 && vecTracks[i].age >= 10 && vecTracks[i].cntConsecutiveInvisible == 0))
+		// if ((vecTracks[i].age >= 2 && vecTracks[i].cntConsecutiveInvisible == 0) ||
+		// 	(vecTracks[i].cls == 1 && vecTracks[i].age >= m_thres_invisibleCnt && vecTracks[i].cntConsecutiveInvisible <= m_thres_invisibleCnt/2))
+
+		if (vecTracks[i].age >= 2 && vecTracks[i].cntConsecutiveInvisible == 0)
 		{	
 			vecTracks[i].cur_bbox.header.seq = vecTracks[i].age; // header.seq를 tracking object의 age로 사용
 			vecTracks[i].cur_bbox.value = vecTracks[i].v;
