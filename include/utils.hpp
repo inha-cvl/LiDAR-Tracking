@@ -3,6 +3,7 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/Imu.h>
+#include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <std_msgs/Float32MultiArray.h>
 #include <jsk_recognition_msgs/BoundingBoxArray.h>
@@ -290,6 +291,52 @@ Eigen::Quaterniond calculateRotationBetweenStamps(const std::deque<sensor_msgs::
     }
 
     return rotation_increment.unit_quaternion();
+}
+
+geometry_msgs::PoseStamped getENU(const message_filters::Cache<geometry_msgs::PoseStamped>& enu_cache, const ros::Time& input_stamp)
+{
+    // 가장 가까운 PoseStamped를 찾기 위한 변수 초기화
+    geometry_msgs::PoseStamped closest_pose;
+
+    // input_stamp 이전의 가장 가까운 PoseStamped
+    boost::shared_ptr<geometry_msgs::PoseStamped const> pose_before = enu_cache.getElemBeforeTime(input_stamp);
+    // input_stamp 이후의 가장 가까운 PoseStamped
+    boost::shared_ptr<geometry_msgs::PoseStamped const> pose_after = enu_cache.getElemAfterTime(input_stamp);
+
+    // 두 PoseStamped 중 input_stamp와 더 가까운 것을 선택
+    if (pose_before && pose_after)
+    {
+        // time difference 계산
+        ros::Duration diff_before = input_stamp - pose_before->header.stamp;
+        ros::Duration diff_after = pose_after->header.stamp - input_stamp;
+
+        // 더 가까운 PoseStamped를 선택
+        if (diff_before < diff_after)
+        {
+            closest_pose = *pose_before;
+        }
+        else
+        {
+            closest_pose = *pose_after;
+        }
+    }
+    // pose_before만 존재하는 경우
+    else if (pose_before)
+    {
+        closest_pose = *pose_before;
+    }
+    // pose_after만 존재하는 경우
+    else if (pose_after)
+    {
+        closest_pose = *pose_after;
+    }
+    else
+    {
+        // enu_cache에 적절한 값이 없는 경우, 기본 값을 반환할 수 있음
+        ROS_WARN("No matching PoseStamped found in the cache.");
+    }
+
+    return closest_pose;
 }
 
 std::vector<std::pair<float, float>> map_reader(std::string map_path)

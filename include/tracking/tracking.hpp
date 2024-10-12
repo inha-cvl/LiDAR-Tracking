@@ -32,6 +32,8 @@ public:
         
         global_path = map_reader(map.c_str());
 
+        enu_cache.setCacheSize(100);
+        
         // integration
         last_timestamp_cluster = -1;
         last_timestamp_deep = -1;
@@ -45,6 +47,8 @@ public:
         clearLogFile(correction_time_log_path);
         clearLogFile(average_time_log_path);
     }
+
+    void enuUpdate(const geometry_msgs::PoseStamped::ConstPtr &enu_msg);
 
     void integrationBbox(jsk_recognition_msgs::BoundingBoxArray &cluster_bbox_array, 
                          jsk_recognition_msgs::BoundingBoxArray &deep_bbox_array,
@@ -99,6 +103,8 @@ private:
     double last_timestamp_cluster;
     double last_timestamp_deep;
 
+    message_filters::Cache<geometry_msgs::PoseStamped> enu_cache;
+
     Track tracker;
     
     // average time check
@@ -110,6 +116,12 @@ private:
     std::string correction_time_log_path = package_path + "correction.txt";
     std::string average_time_log_path = package_path + "average.txt";
 };
+
+void Tracking::enuUpdate(const geometry_msgs::PoseStamped::ConstPtr &enu_msg)
+{   
+    enu_cache.add(enu_msg);
+}
+
 
 void Tracking::integrationBbox(jsk_recognition_msgs::BoundingBoxArray &cluster_bbox_array, 
                                jsk_recognition_msgs::BoundingBoxArray &deep_bbox_array,
@@ -266,7 +278,11 @@ void Tracking::tracking(const jsk_recognition_msgs::BoundingBoxArray &bbox_array
     track_text_array.markers.clear();
     tracker.predictNewLocationOfTracks(input_stamp);
     tracker.assignDetectionsTracks(bbox_array);
-    tracker.assignedTracksUpdate(bbox_array);
+    
+    // tracker.assignedTracksUpdate(bbox_array);
+    geometry_msgs::PoseStamped enu_pose = getENU(enu_cache, input_stamp);
+    tracker.assignedTracksUpdate(bbox_array, enu_pose);
+    
     tracker.unassignedTracksUpdate();
     tracker.deleteLostTracks();
     tracker.createNewTracks(bbox_array);

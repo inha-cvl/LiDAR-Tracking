@@ -34,7 +34,7 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
 
     Tracking_->integrationBbox(cluster_bbox_array, deep_bbox_array, integration_bbox_array, t9);
     Tracking_->cropHDMapBbox(integration_bbox_array, filtered_bbox_array, bba_msg->header.stamp, tf_buffer, t10);
-    Tracking_->tracking(integration_bbox_array, track_bbox_array, track_text_array, bba_msg->header.stamp, t11);
+    Tracking_->tracking(filtered_bbox_array, track_bbox_array, track_text_array, bba_msg->header.stamp, t11);
     Tracking_->correctionBboxRelativeSpeed(track_bbox_array, bba_msg->header.stamp, ros::Time::now(), corrected_bbox_array, t12);
     
     if (checkTransform(tf_buffer, lidar_frame, target_frame)) {
@@ -53,13 +53,13 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
     
     total = ros::Time::now().toSec() - cluster_bbox_array.boxes[0].header.stamp.toSec();
 
-    std::cout << "\033[" << 18 << ";" << 30 << "H" << std::endl;
-    std::cout << "integration & crophdmap : " << t9+t10 << "sec" << std::endl;
-    std::cout << "tracking : " << t11 << "sec" << std::endl;
-    std::cout << "correction : " << t12 << "sec" << std::endl;
-    std::cout << "transform : " << t13 << "sec" << std::endl;
-    std::cout << "total : " << total << " sec" << std::endl;
-    std::cout << "fixed frame : " << fixed_frame << std::endl;
+    // std::cout << "\033[" << 18 << ";" << 30 << "H" << std::endl;
+    // std::cout << "integration & crophdmap : " << t9+t10 << "sec" << std::endl;
+    // std::cout << "tracking : " << t11 << "sec" << std::endl;
+    // std::cout << "correction : " << t12 << "sec" << std::endl;
+    // std::cout << "transform : " << t13 << "sec" << std::endl;
+    // std::cout << "total : " << total << " sec" << std::endl;
+    // std::cout << "fixed frame : " << fixed_frame << std::endl;
     
 }
 
@@ -68,6 +68,11 @@ void callbackDeep(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
     if (bba_msg->boxes.empty()) { return; }
 
     deep_bbox_array = *bba_msg;
+}
+
+void callbackENU(const geometry_msgs::PoseStamped::ConstPtr &msg_in)
+{
+    Tracking_->enuUpdate(msg_in);
 }
 
 int main(int argc, char** argv)
@@ -87,8 +92,10 @@ int main(int argc, char** argv)
     // Tracking 객체를 초기화
     Tracking_ = boost::make_shared<Tracking>(pnh);
 
-    ros::Subscriber sub_cluster_box = nh.subscribe("/cloud_segmentation/cluster_box", 10, callbackCluster);
-    ros::Subscriber sub_deep_box = nh.subscribe("/deep_box", 10, callbackDeep);
+    ros::Subscriber sub_cluster_box = nh.subscribe("/cloud_segmentation/cluster_box", 1, callbackCluster);
+    ros::Subscriber sub_deep_box = nh.subscribe("/deep_box", 1, callbackDeep);
+    ros::Subscriber sub_enu = nh.subscribe("/best/pose", 10, callbackENU);
+
 
     signal(SIGINT, signalHandler);
 

@@ -26,7 +26,7 @@ struct trackingStruct
 	jsk_recognition_msgs::BoundingBox cur_bbox;
 	jsk_recognition_msgs::BoundingBox pre_bbox;
 
-	float vx, vy, v;
+	float vx, vy, v, ax, ay;
 	std::deque<float> vx_deque, vy_deque, v_deque;
 	std::deque<float> orientation_deque;
 
@@ -93,7 +93,8 @@ public:
 	visualization_msgs::Marker get_text_msg(struct trackingStruct &track, int i);
 	void predictNewLocationOfTracks(const ros::Time &currentTime);
 	void assignDetectionsTracks(const jsk_recognition_msgs::BoundingBoxArray &bboxMarkerArray);
-	void assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &bboxMarkerArray);
+	// void assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &bboxMarkerArray);
+	void assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &bboxArray, const geometry_msgs::PoseStamped &enu_pose);
 	void unassignedTracksUpdate();
 	void deleteLostTracks();
 	void createNewTracks(const jsk_recognition_msgs::BoundingBoxArray &bboxMarkerArray);
