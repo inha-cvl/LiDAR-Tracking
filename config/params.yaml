@@ -81,7 +81,7 @@ Tracking:
 
 Mission:
   tracking:
-    cluster_distance: 40 # 클러스터 사용 시작 거리
+    cluster_distance: 70 # 클러스터 사용 시작 거리
     # ground_removal_distance 내에 있는 크기 cluster_ratio, 비율 cluster_ratio 이내 클러스터 삭제
     ground_removal_distance: 50 # 경사로 지면 제거용
     cluster_size: 0.5

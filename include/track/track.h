@@ -93,8 +93,8 @@ public:
 	visualization_msgs::Marker get_text_msg(struct trackingStruct &track, int i);
 	void predictNewLocationOfTracks(const ros::Time &currentTime);
 	void assignDetectionsTracks(const jsk_recognition_msgs::BoundingBoxArray &bboxMarkerArray);
-	// void assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &bboxMarkerArray);
-	void assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &bboxArray, const geometry_msgs::PoseStamped &enu_pose);
+	void assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &bboxMarkerArray);
+	// void assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &bboxArray, const geometry_msgs::PoseStamped &enu_pose);
 	void unassignedTracksUpdate();
 	void deleteLostTracks();
 	void createNewTracks(const jsk_recognition_msgs::BoundingBoxArray &bboxMarkerArray);

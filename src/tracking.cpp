@@ -33,8 +33,8 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
     cluster_bbox_array = *bba_msg;
 
     Tracking_->integrationBbox(cluster_bbox_array, deep_bbox_array, integration_bbox_array, t9);
-    Tracking_->cropHDMapBbox(integration_bbox_array, filtered_bbox_array, bba_msg->header.stamp, tf_buffer, t10);
-    Tracking_->tracking(filtered_bbox_array, track_bbox_array, track_text_array, bba_msg->header.stamp, t11);
+    // Tracking_->cropHDMapBbox(integration_bbox_array, filtered_bbox_array, bba_msg->header.stamp, tf_buffer, t10);
+    Tracking_->tracking(integration_bbox_array, track_bbox_array, track_text_array, bba_msg->header.stamp, t11);
     Tracking_->correctionBboxRelativeSpeed(track_bbox_array, bba_msg->header.stamp, ros::Time::now(), corrected_bbox_array, t12);
     
     if (checkTransform(tf_buffer, lidar_frame, target_frame)) {
@@ -53,13 +53,13 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
     
     total = ros::Time::now().toSec() - cluster_bbox_array.boxes[0].header.stamp.toSec();
 
-    // std::cout << "\033[" << 18 << ";" << 30 << "H" << std::endl;
-    // std::cout << "integration & crophdmap : " << t9+t10 << "sec" << std::endl;
-    // std::cout << "tracking : " << t11 << "sec" << std::endl;
-    // std::cout << "correction : " << t12 << "sec" << std::endl;
-    // std::cout << "transform : " << t13 << "sec" << std::endl;
-    // std::cout << "total : " << total << " sec" << std::endl;
-    // std::cout << "fixed frame : " << fixed_frame << std::endl;
+    std::cout << "\033[" << 18 << ";" << 30 << "H" << std::endl;
+    std::cout << "integration & crophdmap : " << t9+t10 << "sec" << std::endl;
+    std::cout << "tracking : " << t11 << "sec" << std::endl;
+    std::cout << "correction : " << t12 << "sec" << std::endl;
+    std::cout << "transform : " << t13 << "sec" << std::endl;
+    std::cout << "total : " << total << " sec" << std::endl;
+    std::cout << "fixed frame : " << fixed_frame << std::endl;
     
 }
 

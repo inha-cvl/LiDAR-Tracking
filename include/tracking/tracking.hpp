@@ -279,9 +279,9 @@ void Tracking::tracking(const jsk_recognition_msgs::BoundingBoxArray &bbox_array
     tracker.predictNewLocationOfTracks(input_stamp);
     tracker.assignDetectionsTracks(bbox_array);
     
-    // tracker.assignedTracksUpdate(bbox_array);
-    geometry_msgs::PoseStamped enu_pose = getENU(enu_cache, input_stamp);
-    tracker.assignedTracksUpdate(bbox_array, enu_pose);
+    tracker.assignedTracksUpdate(bbox_array);
+    // geometry_msgs::PoseStamped enu_pose = getENU(enu_cache, input_stamp);
+    // tracker.assignedTracksUpdate(bbox_array, enu_pose);
     
     tracker.unassignedTracksUpdate();
     tracker.deleteLostTracks();

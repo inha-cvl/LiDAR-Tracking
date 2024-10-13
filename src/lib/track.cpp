@@ -234,7 +234,7 @@ void Track::assignDetectionsTracks(const jsk_recognition_msgs::BoundingBoxArray 
 }
 
 // 상대 좌표계
-/*
+
 void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &bboxArray)
 {	
 	for (int i = 0; i < (int)vecAssignments.size(); i++)
@@ -294,8 +294,9 @@ void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &b
 		vecTracks[idT].cntConsecutiveInvisible = 0;
 	}
 }
-*/
+
 // 전역 좌표계
+/*
 void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &bboxArray, const geometry_msgs::PoseStamped &enu_pose)
 {
     // ENU 좌표와 Yaw(헤딩 방향)를 바탕으로 객체 추적을 업데이트
@@ -363,7 +364,7 @@ void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &b
         vecTracks[idT].cntConsecutiveInvisible = 0;
     }
 }
-
+*/
 
 void Track::unassignedTracksUpdate()
 {
@@ -374,7 +375,7 @@ void Track::unassignedTracksUpdate()
 		vecTracks[id].cntConsecutiveInvisible++;
 
 		// 객체 유지
-		// vecTracks[id].cur_bbox = vecTracks[id].pre_bbox;
+		vecTracks[id].cur_bbox = vecTracks[id].pre_bbox;
 	}
 }
 
