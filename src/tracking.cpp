@@ -35,16 +35,16 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
     Tracking_->integrationBbox(cluster_bbox_array, deep_bbox_array, integration_bbox_array, t9);
     // Tracking_->cropHDMapBbox(integration_bbox_array, filtered_bbox_array, bba_msg->header.stamp, tf_buffer, t10);
     Tracking_->tracking(integration_bbox_array, track_bbox_array, track_text_array, bba_msg->header.stamp, t11);
-    Tracking_->correctionBboxRelativeSpeed(track_bbox_array, bba_msg->header.stamp, ros::Time::now(), corrected_bbox_array, t12);
+    // Tracking_->correctionBboxRelativeSpeed(track_bbox_array, bba_msg->header.stamp, ros::Time::now(), corrected_bbox_array, t12);
     
     if (checkTransform(tf_buffer, lidar_frame, target_frame)) {
-        Tracking_->transformBbox(corrected_bbox_array, tf_buffer, transformed_bbox_array, t13);
+        Tracking_->transformBbox(track_bbox_array, tf_buffer, transformed_bbox_array, t13);
         // Tracking_->correctionBbox(transformed_bbox_array, bba_msg->header.stamp, ros::Time::now(), tf_buffer, corrected_bbox_array, t13);
         fixed_frame = target_frame;
         output_bbox_array = transformed_bbox_array;
     } else {
         fixed_frame = lidar_frame;
-        output_bbox_array = corrected_bbox_array;
+        output_bbox_array = track_bbox_array;
     }
     
     pub_track_box.publish(bba2msg(output_bbox_array, ros::Time::now(), fixed_frame));

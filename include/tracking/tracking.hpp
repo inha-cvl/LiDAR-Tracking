@@ -351,11 +351,12 @@ void Tracking::correctionBboxRelativeSpeed(const jsk_recognition_msgs::BoundingB
             double yaw = tf::getYaw(box.pose.orientation);
             double delta_x = velocity * delta_time * cos(yaw);
             double delta_y = velocity * delta_time * sin(yaw);
-            // 60km/h & 0.1sec -> 1.67m
-            if (delta_x < 1.7 && delta_y < 1.7) { 
-                corrected_box.pose.position.x += delta_x; // x 방향으로 이동
-                corrected_box.pose.position.y += delta_y; // y 방향으로 이동
-            }            
+            // 50km/h & 0.05sec -> 0.69m 
+            delta_x = std::copysign(std::min(std::abs(delta_x), 1.0), delta_x);
+            delta_y = std::copysign(std::min(std::abs(delta_y), 1.0), delta_y);
+
+            corrected_box.pose.position.x += delta_x; // x 방향으로 이동
+            corrected_box.pose.position.y += delta_y; // y 방향으로 이동                    
         }
         
         output_bbox_array.boxes.push_back(corrected_box);

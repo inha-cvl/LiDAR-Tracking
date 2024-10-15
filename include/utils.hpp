@@ -332,8 +332,18 @@ geometry_msgs::PoseStamped getENU(const message_filters::Cache<geometry_msgs::Po
     }
     else
     {
-        // enu_cache에 적절한 값이 없는 경우, 기본 값을 반환할 수 있음
-        ROS_WARN("No matching PoseStamped found in the cache.");
+        // enu_cache에 적절한 값이 없는 경우
+        // 캐시 내에서 가장 최근 값을 가져오기 위해 마지막 요소를 찾음
+        boost::shared_ptr<geometry_msgs::PoseStamped const> last_pose = enu_cache.getElemAfterTime(ros::Time(0));
+        if (last_pose)
+        {
+            closest_pose = *last_pose;  // 가장 최근 데이터를 선택
+            ROS_WARN("No matching PoseStamped found. Returning the most recent data.");
+        }
+        else
+        {
+            ROS_WARN("No matching PoseStamped found in the cache, and no recent data available.");
+        }
     }
 
     return closest_pose;

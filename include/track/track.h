@@ -27,6 +27,7 @@ struct trackingStruct
 	jsk_recognition_msgs::BoundingBox pre_bbox;
 
 	float vx, vy, v, ax, ay;
+
 	std::deque<float> vx_deque, vy_deque, v_deque;
 	std::deque<float> orientation_deque;
 

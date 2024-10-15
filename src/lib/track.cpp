@@ -35,9 +35,6 @@ Track::Track()
 	m_matMeasurement.at<float>(2, 2) = 1.0f; // vx
 	m_matMeasurement.at<float>(3, 3) = 1.0f; // vy
 
-	
-
-
 	// Q size small -> smooth 프로세스 노이즈
 	float Q[] = {1e-3f, 1e-3f, 1e-2f, 1e-2f, 1e-1f, 1e-1f};
 	Mat tempQ(stateVariableDim, 1, CV_32FC1, Q);
@@ -234,7 +231,6 @@ void Track::assignDetectionsTracks(const jsk_recognition_msgs::BoundingBoxArray 
 }
 
 // 상대 좌표계
-
 void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &bboxArray)
 {	
 	for (int i = 0; i < (int)vecAssignments.size(); i++)
@@ -243,15 +239,19 @@ void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &b
 		int idD = vecAssignments[i].second;
 
         // 위치 변화로부터 속도 계산
-        float vx = (bboxArray.boxes[idD].pose.position.x - vecTracks[idT].pre_bbox.pose.position.x) / dt;
-        float vy = (bboxArray.boxes[idD].pose.position.y - vecTracks[idT].pre_bbox.pose.position.y) / dt;
+		float dx = bboxArray.boxes[idD].pose.position.x - vecTracks[idT].pre_bbox.pose.position.x;
+		float dy = bboxArray.boxes[idD].pose.position.y - vecTracks[idT].pre_bbox.pose.position.y;
 
+        float vx = dx / dt;
+        float vy = dy / dt;
+        
 		// 속도 deque 업데이트 및 평균 계산
         velocity_push_back(vecTracks[idT].vx_deque, vx);
         velocity_push_back(vecTracks[idT].vy_deque, vy);
         vecTracks[idT].vx = std::accumulate(vecTracks[idT].vx_deque.begin(), vecTracks[idT].vx_deque.end(), 0.0f) / vecTracks[idT].vx_deque.size();
         vecTracks[idT].vy = std::accumulate(vecTracks[idT].vy_deque.begin(), vecTracks[idT].vy_deque.end(), 0.0f) / vecTracks[idT].vy_deque.size();
 		
+
 		// 측정값 구성 (위치와 속도 포함)
         Mat measure = Mat::zeros(stateMeasureDim, 1, CV_32FC1);
         measure.at<float>(0) = bboxArray.boxes[idD].pose.position.x;
@@ -261,12 +261,20 @@ void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &b
 
         // 칼만 필터 보정
         vecTracks[idT].kf.correct(measure);
-
-		vecTracks[idT].v = getVectorScale(vecTracks[idT].kf.statePost.at<float>(2), vecTracks[idT].kf.statePost.at<float>(3)); // 1
-		// vecTracks[idT].v = getVectorScale(vecTracks[idT].vx, vecTracks[idT].vy); // 2
-		// vecTracks[idT].v = vecTracks[idT].kf.statePost.at<float>(2);
-		// vecTracks[idT].v = vecTracks[idT].vx; // 3
 		
+		// vecTracks[idT].v = getVectorScale(vecTracks[idT].kf.statePost.at<float>(2), vecTracks[idT].kf.statePost.at<float>(3));
+		vecTracks[idT].v = getVectorScale(vecTracks[idT].vx, vecTracks[idT].vy);
+		// vecTracks[idT].v = vecTracks[idT].kf.statePost.at<float>(2);
+		// vecTracks[idT].v = vecTracks[idT].vx;
+		
+		float k = 300.0f;  // 비례 상수, 필요에 따라 조정 가능
+
+		// dx의 제곱을 이용한 가변적인 scaling factor 계산
+		// float scaling_factor = std::min(1 + k * std::pow(std::abs(dx), 2), 6.0);
+		float scaling_factor = std::min(1 + k * std::pow(std::abs(sqrt(pow(dx, 2) + pow(dy, 2))), 2), 6.0);
+
+		vecTracks[idT].v = vecTracks[idT].v * scaling_factor;
+
 		// 이전 orientation들과 비교
         orientation_push_back(vecTracks[idT].orientation_deque, tf::getYaw(bboxArray.boxes[idD].pose.orientation));
 		vecTracks[idT].cur_bbox.pose.orientation = tf::createQuaternionMsgFromYaw(vecTracks[idT].orientation_deque.back());
@@ -297,33 +305,57 @@ void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &b
 
 // 전역 좌표계
 /*
+geometry_msgs::PoseStamped previous_enu_pose;
+bool has_previous_enu_pose = false;  // 초기 상태를 나타내기 위한 플래그
 void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &bboxArray, const geometry_msgs::PoseStamped &enu_pose)
 {
-    // ENU 좌표와 Yaw(헤딩 방향)를 바탕으로 객체 추적을 업데이트
-    float enu_x = enu_pose.pose.position.x;
-    float enu_y = enu_pose.pose.position.y;
+    // 현재 ENU 좌표와 Yaw(헤딩 방향)를 가져옵니다.
+    float enu_x_curr = enu_pose.pose.position.x;
+    float enu_y_curr = enu_pose.pose.position.y;
 
-    // Yaw는 orientation.z로 주어지고, 디그리 단위이므로 라디안으로 변환
-    float yaw = enu_pose.pose.orientation.z * M_PI / 180.0;  // 디그리 -> 라디안 변환
+    // 현재 Yaw를 디그리에서 라디안으로 변환
+    float yaw_curr = enu_pose.pose.orientation.z * M_PI / 180.0f;
+
+    // 이전 ENU 좌표와 Yaw를 가져옵니다.
+    float enu_x_prev, enu_y_prev, yaw_prev;
+    if (has_previous_enu_pose)
+    {
+        enu_x_prev = previous_enu_pose.pose.position.x;
+        enu_y_prev = previous_enu_pose.pose.position.y;
+        yaw_prev = previous_enu_pose.pose.orientation.z * M_PI / 180.0f;  // 디그리 -> 라디안 변환
+    }
+    else
+    {
+        // 이전 ENU 포즈가 없는 경우, 현재 값을 사용합니다.
+        enu_x_prev = enu_x_curr;
+        enu_y_prev = enu_y_curr;
+        yaw_prev = yaw_curr;
+    }
 
     for (int i = 0; i < static_cast<int>(vecAssignments.size()); i++)
     {
         int idT = vecAssignments[i].first;  // 트랙 ID
         int idD = vecAssignments[i].second; // 감지된 객체 ID
 
-        // 상대 좌표 -> 전역 좌표로 변환 (ENU 기준)
-        float relative_x = bboxArray.boxes[idD].pose.position.x;
-        float relative_y = bboxArray.boxes[idD].pose.position.y;
+        // 현재 감지된 객체의 상대 좌표
+        float relative_x_curr = bboxArray.boxes[idD].pose.position.x;
+        float relative_y_curr = bboxArray.boxes[idD].pose.position.y;
 
-        // yaw(헤딩 방향)를 고려하여 전역 좌표로 변환
-        float global_x = enu_x + (cos(yaw) * relative_x - sin(yaw) * relative_y);
-        float global_y = enu_y + (sin(yaw) * relative_x + cos(yaw) * relative_y);
+        // 이전 감지된 객체의 상대 좌표
+        float relative_x_prev = vecTracks[idT].pre_bbox.pose.position.x;
+        float relative_y_prev = vecTracks[idT].pre_bbox.pose.position.y;
 
-        // 이전 위치로부터 속도 계산
-        float prev_x = vecTracks[idT].cur_bbox.pose.position.x;
-        float prev_y = vecTracks[idT].cur_bbox.pose.position.y;
-        float vx = (global_x - prev_x) / dt;
-        float vy = (global_y - prev_y) / dt;
+        // yaw를 고려하여 현재 감지된 객체의 전역 좌표로 변환
+        float global_x_curr = enu_x_curr + (cos(yaw_curr) * relative_x_curr - sin(yaw_curr) * relative_y_curr);
+        float global_y_curr = enu_y_curr + (sin(yaw_curr) * relative_x_curr + cos(yaw_curr) * relative_y_curr);
+
+        // yaw를 고려하여 이전 감지된 객체의 전역 좌표로 변환
+        float global_x_prev = enu_x_prev + (cos(yaw_prev) * relative_x_prev - sin(yaw_prev) * relative_y_prev);
+        float global_y_prev = enu_y_prev + (sin(yaw_prev) * relative_x_prev + cos(yaw_prev) * relative_y_prev);
+
+        // 이전 위치로부터 속도 계산 (전역 좌표계 기준)
+        float vx = (global_x_curr - global_x_prev) / dt;
+        float vy = (global_y_curr - global_y_prev) / dt;
 
         // 속도 deque 업데이트
         velocity_push_back(vecTracks[idT].vx_deque, vx);
@@ -331,28 +363,40 @@ void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &b
         vecTracks[idT].vx = std::accumulate(vecTracks[idT].vx_deque.begin(), vecTracks[idT].vx_deque.end(), 0.0f) / vecTracks[idT].vx_deque.size();
         vecTracks[idT].vy = std::accumulate(vecTracks[idT].vy_deque.begin(), vecTracks[idT].vy_deque.end(), 0.0f) / vecTracks[idT].vy_deque.size();
 
-        // 측정값(전역 좌표와 속도)을 Kalman 필터에 적용
+        // 측정값(상대 좌표와 속도)을 Kalman 필터에 적용
         Mat measure = Mat::zeros(stateMeasureDim, 1, CV_32FC1);
-        measure.at<float>(0) = global_x;  // 전역 x 좌표
-        measure.at<float>(1) = global_y;  // 전역 y 좌표
-        measure.at<float>(2) = vecTracks[idT].vx; // x 방향 속도
-        measure.at<float>(3) = vecTracks[idT].vy; // y 방향 속도
+        measure.at<float>(0) = relative_x_curr;    // 상대 x 좌표
+        measure.at<float>(1) = relative_y_curr;    // 상대 y 좌표
+        measure.at<float>(2) = vecTracks[idT].vx;  // x 방향 속도 (전역 좌표계)
+        measure.at<float>(3) = vecTracks[idT].vy;  // y 방향 속도 (전역 좌표계)
 
         // Kalman 필터 보정
         vecTracks[idT].kf.correct(measure);
 
-        // 추적된 객체의 새로운 위치 및 방향 업데이트
-        vecTracks[idT].cur_bbox.pose.position.x = global_x;
-        vecTracks[idT].cur_bbox.pose.position.y = global_y;
-        orientation_push_back(vecTracks[idT].orientation_deque, yaw);
+        // 속도의 크기 계산 (전역 좌표계 속도 기반)
+        vecTracks[idT].v = sqrt(pow(vecTracks[idT].kf.statePost.at<float>(2), 2) + pow(vecTracks[idT].kf.statePost.at<float>(3), 2));
+
+        // 위치 정보는 상대 좌표계를 그대로 유지
+        vecTracks[idT].cur_bbox.pose.position = bboxArray.boxes[idD].pose.position;
+
+        // Orientation 업데이트 (상대 좌표계 기준)
+        orientation_push_back(vecTracks[idT].orientation_deque, tf::getYaw(bboxArray.boxes[idD].pose.orientation));
         vecTracks[idT].cur_bbox.pose.orientation = tf::createQuaternionMsgFromYaw(vecTracks[idT].orientation_deque.back());
 
-        // 바운딩 박스 크기 및 기타 정보 업데이트
-        vecTracks[idT].cur_bbox.dimensions = bboxArray.boxes[idD].dimensions;
-        vecTracks[idT].cur_bbox.label = bboxArray.boxes[idD].label;
+        // 딥러닝 기반 정보 우선 사용 로직은 기존과 동일하게 유지
+        if (bboxArray.boxes[idD].label == 0 && vecTracks[idT].pre_bbox.label != 0 && vecTracks[idT].age > m_thres_invisibleCnt) {
+            vecTracks[idT].cur_bbox.dimensions = vecTracks[idT].pre_bbox.dimensions;
+            vecTracks[idT].cur_bbox.pose.orientation = vecTracks[idT].pre_bbox.pose.orientation;
+            vecTracks[idT].cur_bbox.label = vecTracks[idT].pre_bbox.label;
+        } else {
+            vecTracks[idT].cur_bbox.dimensions = bboxArray.boxes[idD].dimensions;
+            vecTracks[idT].cur_bbox.pose.orientation = bboxArray.boxes[idD].pose.orientation;
+            vecTracks[idT].cur_bbox.label = bboxArray.boxes[idD].label;
+        }
+
         vecTracks[idT].cur_bbox.header.stamp = bboxArray.boxes[idD].header.stamp;
 
-        // 이전 바운딩 박스 정보를 저장
+        // 이전 상태 업데이트
         vecTracks[idT].pre_bbox = vecTracks[idT].cur_bbox;
         vecTracks[idT].cls = vecTracks[idT].cur_bbox.label;
         if (vecTracks[idT].cls != 0) {
@@ -363,6 +407,10 @@ void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &b
         vecTracks[idT].cntTotalVisible++;
         vecTracks[idT].cntConsecutiveInvisible = 0;
     }
+
+    // 현재의 enu_pose를 저장하여 다음 프레임에서 이전 enu_pose로 사용
+    previous_enu_pose = enu_pose;
+    has_previous_enu_pose = true;
 }
 */
 
@@ -424,12 +472,6 @@ void Track::createNewTracks(const jsk_recognition_msgs::BoundingBoxArray &bboxAr
 		m_matMeasurement.copyTo(ts.kf.measurementMatrix);       //H
 		m_matProcessNoiseCov.copyTo(ts.kf.processNoiseCov);     //Q
 		m_matMeasureNoiseCov.copyTo(ts.kf.measurementNoiseCov); //R
-
-		// Mat tempCov(stateVariableDim, 1, CV_32FC1, 1);
-		// tempCov.at<float>(0) = 1e-3f; // x 위치 불확실성
-		// tempCov.at<float>(1) = 1e-3f; // y 위치 불확실성
-		// tempCov.at<float>(2) = 1e-2f;  // vx 속도 불확실성
-		// tempCov.at<float>(3) = 1e-2f;  // vy 속도 불확실성
 
 		float P[] = {1e-3f, 1e-3f, 1e-2f, 1e-2f, 1e-1f, 1e-1f};
 		Mat tempCov(stateVariableDim, 1, CV_32FC1, P);
