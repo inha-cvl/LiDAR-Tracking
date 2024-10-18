@@ -94,7 +94,7 @@ int main(int argc, char** argv)
 
     ros::Subscriber sub_cluster_box = nh.subscribe("/cloud_segmentation/cluster_box", 1, callbackCluster);
     ros::Subscriber sub_deep_box = nh.subscribe("/deep_box", 1, callbackDeep);
-    ros::Subscriber sub_enu = nh.subscribe("/best/pose", 10, callbackENU);
+    // ros::Subscriber sub_enu = nh.subscribe("/best/pose", 10, callbackENU);
 
 
     signal(SIGINT, signalHandler);

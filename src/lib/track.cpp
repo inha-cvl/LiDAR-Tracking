@@ -267,13 +267,13 @@ void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &b
 		// vecTracks[idT].v = vecTracks[idT].kf.statePost.at<float>(2);
 		// vecTracks[idT].v = vecTracks[idT].vx;
 		
-		float k = 300.0f;  // 비례 상수, 필요에 따라 조정 가능
+		// float k = 100.0f;  // 비례 상수, 필요에 따라 조정 가능
 
 		// dx의 제곱을 이용한 가변적인 scaling factor 계산
 		// float scaling_factor = std::min(1 + k * std::pow(std::abs(dx), 2), 6.0);
-		float scaling_factor = std::min(1 + k * std::pow(std::abs(sqrt(pow(dx, 2) + pow(dy, 2))), 2), 6.0);
+		// float scaling_factor = std::min(1 + k * std::pow(std::abs(sqrt(pow(dx, 2) + pow(dy, 2))), 2), 6.0);
 
-		vecTracks[idT].v = vecTracks[idT].v * scaling_factor;
+		// vecTracks[idT].v = vecTracks[idT].v * scaling_factor;
 
 		// 이전 orientation들과 비교
         orientation_push_back(vecTracks[idT].orientation_deque, tf::getYaw(bboxArray.boxes[idD].pose.orientation));

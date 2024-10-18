@@ -74,7 +74,7 @@ Tracking:
   track:
     invisibleCnt: 20
     deque:
-      number_velocity: 4
+      number_velocity: 3
       number_orientation: 10
       thresh_velocity: 30.0 # m/s
       thresh_orientation: 30.0 # degree
