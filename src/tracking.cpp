@@ -44,7 +44,7 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
         output_bbox_array = transformed_bbox_array;
     } else {
         fixed_frame = lidar_frame;
-        output_bbox_array = track_bbox_array;
+        output_bbox_array = integration_bbox_array;
     }
     
     pub_track_box.publish(bba2msg(output_bbox_array, ros::Time::now(), fixed_frame));

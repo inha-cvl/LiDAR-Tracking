@@ -308,7 +308,7 @@ void CloudSegmentation<PointT>::cropPointCloud(const pcl::PointCloud<PointT>& cl
         if (crop_intensity_enabled && point.intensity < crop_intensity) { continue; }
         
         // Car exclusion
-        if (point.x >= -2.0 && point.x <= 2.0 &&
+        if (point.x >= -10.0 && point.x <= 2.0 &&
             point.y >= -0.8 && point.y <= 0.8) { continue; }
 
         // Rectangle
