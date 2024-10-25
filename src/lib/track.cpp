@@ -238,42 +238,28 @@ void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &b
 		int idT = vecAssignments[i].first;
 		int idD = vecAssignments[i].second;
 
-        // 위치 변화로부터 속도 계산
 		float dx = bboxArray.boxes[idD].pose.position.x - vecTracks[idT].pre_bbox.pose.position.x;
 		float dy = bboxArray.boxes[idD].pose.position.y - vecTracks[idT].pre_bbox.pose.position.y;
 
         float vx = dx / dt;
         float vy = dy / dt;
         
-		// 속도 deque 업데이트 및 평균 계산
         velocity_push_back(vecTracks[idT].vx_deque, vx);
         velocity_push_back(vecTracks[idT].vy_deque, vy);
         vecTracks[idT].vx = std::accumulate(vecTracks[idT].vx_deque.begin(), vecTracks[idT].vx_deque.end(), 0.0f) / vecTracks[idT].vx_deque.size();
         vecTracks[idT].vy = std::accumulate(vecTracks[idT].vy_deque.begin(), vecTracks[idT].vy_deque.end(), 0.0f) / vecTracks[idT].vy_deque.size();
 		
-
-		// 측정값 구성 (위치와 속도 포함)
         Mat measure = Mat::zeros(stateMeasureDim, 1, CV_32FC1);
         measure.at<float>(0) = bboxArray.boxes[idD].pose.position.x;
         measure.at<float>(1) = bboxArray.boxes[idD].pose.position.y;
         measure.at<float>(2) = vecTracks[idT].vx;
         measure.at<float>(3) = vecTracks[idT].vy;
 
-        // 칼만 필터 보정
         vecTracks[idT].kf.correct(measure);
 		
 		// vecTracks[idT].v = getVectorScale(vecTracks[idT].kf.statePost.at<float>(2), vecTracks[idT].kf.statePost.at<float>(3));
 		vecTracks[idT].v = getVectorScale(vecTracks[idT].vx, vecTracks[idT].vy);
 		// vecTracks[idT].v = vecTracks[idT].kf.statePost.at<float>(2);
-		// vecTracks[idT].v = vecTracks[idT].vx;
-		
-		// float k = 100.0f;  // 비례 상수, 필요에 따라 조정 가능
-
-		// dx의 제곱을 이용한 가변적인 scaling factor 계산
-		// float scaling_factor = std::min(1 + k * std::pow(std::abs(dx), 2), 6.0);
-		// float scaling_factor = std::min(1 + k * std::pow(std::abs(sqrt(pow(dx, 2) + pow(dy, 2))), 2), 6.0);
-
-		// vecTracks[idT].v = vecTracks[idT].v * scaling_factor;
 
 		// 이전 orientation들과 비교
         orientation_push_back(vecTracks[idT].orientation_deque, tf::getYaw(bboxArray.boxes[idD].pose.orientation));
