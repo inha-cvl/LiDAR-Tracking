@@ -69,8 +69,8 @@ void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
     // CloudSegmentation_->undistortPointCloud(nonGroundCloud, undistortionCloud, t5);
     // pub_undistortion_cloud.publish(cloud2msg(undistortionCloud, input_stamp, lidar_frame));
 
-    CloudSegmentation_->pcl2FloatArray(nonGroundCloud, point_array, t6);
-    pub_point_array.publish(array2msg(point_array, input_stamp, lidar_frame));
+    // CloudSegmentation_->pcl2FloatArray(nonGroundCloud, point_array, t6);
+    // pub_point_array.publish(array2msg(point_array, input_stamp, lidar_frame));
 
     // CloudSegmentation_->downsamplingPointCloud(undistortionCloud, downsamplingCloud, t6);
     // pub_downsampling_cloud.publish(cloud2msg(downsamplingCloud, input_stamp, lidar_frame));
