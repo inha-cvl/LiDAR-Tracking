@@ -9,7 +9,6 @@ public:
     CloudSegmentation() {};
 
     CloudSegmentation(ros::NodeHandle& nh) : nh_(nh) {
-        nh_.getParam("Public/map", map);
         nh_.getParam("Public/lidar_frame", lidar_frame);
         nh_.getParam("Public/target_frame", target_frame);
         nh_.getParam("Public/world_frame", world_frame);
@@ -52,7 +51,7 @@ public:
         global_path = map_reader(map.c_str());
 
         // lidar
-        dt_l_c_ = 0.05;
+        dt_l_c_ = 0.1;
         cur_stamp = ros::Time(0);
         pre_stamp = ros::Time(0);
 
@@ -82,7 +81,7 @@ public:
     }
 
     void msgToPointCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg, pcl::PointCloud<PointT>& cloud);
-    void imuUpdate(const sensor_msgs::Imu::ConstPtr &imu_msg);
+    void updateImu(const sensor_msgs::Imu::ConstPtr &imu_msg);
     void projectPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double &time_taken);
     void convertPointCloudToImage(const pcl::PointCloud<PointT>& cloudIn, cv::Mat &imageOut, double &time_taken);
     void cropPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double &time_taken);
@@ -199,7 +198,7 @@ void CloudSegmentation<PointT>::msgToPointCloud(const sensor_msgs::PointCloud2::
 }
 
 template<typename PointT> inline
-void CloudSegmentation<PointT>::imuUpdate(const sensor_msgs::Imu::ConstPtr &imu_msg)
+void CloudSegmentation<PointT>::updateImu(const sensor_msgs::Imu::ConstPtr &imu_msg)
 {   
     imu_cache.add(imu_msg);
 }

@@ -34,7 +34,7 @@ std::string lidar_topic, imu_topic, lidar_frame, target_frame, world_frame;
 
 void callbackIMU(const sensor_msgs::Imu::ConstPtr &msg_in) 
 {
-    CloudSegmentation_->imuUpdate(msg_in);
+    CloudSegmentation_->updateImu(msg_in);
       // 캐시에 IMU 데이터를 추가
 }
 

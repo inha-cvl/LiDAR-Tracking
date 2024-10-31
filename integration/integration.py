@@ -10,6 +10,8 @@ import tf
 import tf2_ros
 import rospy
 import roslib
+from sensor_msgs.msg import PointCloud2
+import sensor_msgs.point_cloud2 as pc2
 from novatel_oem7_msgs.msg import INSPVA
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Point, TransformStamped
@@ -565,7 +567,6 @@ class LocalizerHDMap:
 
         rospy.init_node('Localizer')
         pub_lanelet_map = rospy.Publisher('/lanelet_map', MarkerArray, queue_size=1, latch=True)
-        # map_path = "/home/q/software/Localizer_hdmap/songdo.json"
         self.lmap = LaneletMap(map_path, self.interp_distance)
         lanelet_map_viz = LaneletMapViz(self.lmap.lanelets, self.lmap.for_viz)
         pub_lanelet_map.publish(lanelet_map_viz)
@@ -573,7 +574,7 @@ class LocalizerHDMap:
         # microlanelet
         self.graph = MicroLaneletGraph(self.lmap, 15.0).graph
 
-        self.pub_waypoints_marker = rospy.Publisher('/local_waypoints', MarkerArray, queue_size=1)
+        self.pub_waypoints = rospy.Publisher('/waypoints', PointCloud2, queue_size=1)
 
         rospy.loginfo("Lanelet map published on lanelet_map")
 
@@ -594,7 +595,6 @@ class LocalizerHDMap:
 
         self.build_waypoint_kdtree()
 
-    
     def publish_static_tfs(self, transforms):
         static_transformStamped_vec = []
         for translation, rotation, child_frame, parent_frame in transforms:
@@ -638,26 +638,6 @@ class LocalizerHDMap:
         self.pub_ego_car.publish(self.ego_car)
         self.update_local_waypoints()
 
-    def publish_waypoints_marker(self, waypoints):
-        marker = Marker()
-        marker.header.frame_id = 'ego_car'
-        marker.header.stamp = self.timestamp
-        marker.ns = 'local_waypoints'
-        marker.id = 0
-        marker.type = Marker.POINTS  # 포인트로 표시
-        marker.action = Marker.ADD
-        marker.scale.x = 0.2  # 포인트 크기
-        marker.scale.y = 0.2
-        marker.color.r = 0.0
-        marker.color.g = 1.0  # 녹색으로 표시
-        marker.color.b = 0.0
-        marker.color.a = 1.0
-        marker.points = [Point(x=pt[0], y=pt[1], z=0.0) for pt in waypoints]
-
-        marker_array = MarkerArray()
-        marker_array.markers.append(marker)
-        self.pub_waypoints_marker.publish(marker_array)
-
     def build_waypoint_kdtree(self):
         all_waypoints = []
         for id_, lanelet in self.lmap.lanelets.items():
@@ -666,44 +646,39 @@ class LocalizerHDMap:
         self.waypoints_np = np.array(all_waypoints)
         self.kdtree = KDTree(self.waypoints_np)
 
-    
     def update_local_waypoints(self):
-        # 차량의 현재 위치 가져오기
-        x_vehicle = self.x
-        y_vehicle = self.y
-
         if not hasattr(self, 'kdtree'):
             rospy.logerr("KD-Tree is not built yet.")
-            self.publish_waypoints_marker([])
+            self.pub_waypoints(PointCloud2())
             return
 
-        # 반경 100m 이내의 웨이포인트 인덱스 검색
-        indices = self.kdtree.query_ball_point([x_vehicle, y_vehicle], r=100.0)
+        indices = self.kdtree.query_ball_point([self.x, self.y], r=100.0)
 
         if not indices:
-            # 주변에 웨이포인트가 없는 경우
-            self.publish_waypoints_marker([])
+            self.pub_waypoints(PointCloud2())
             return
 
-        # 해당 웨이포인트들을 가져옵니다.
         nearby_waypoints = self.waypoints_np[indices]
 
-        # 웨이포인트를 변환합니다.
         yaw_vehicle = self.yaw
         yaw_rad = math.radians(yaw_vehicle)
         cos_yaw = math.cos(-yaw_rad)
         sin_yaw = math.sin(-yaw_rad)
 
-        dx = nearby_waypoints[:, 0] - x_vehicle
-        dy = nearby_waypoints[:, 1] - y_vehicle
+        dx = nearby_waypoints[:, 0] - self.x
+        dy = nearby_waypoints[:, 1] - self.y
 
         x_e = dx * cos_yaw - dy * sin_yaw
         y_e = dx * sin_yaw + dy * cos_yaw
 
-        transformed_waypoints = list(zip(x_e, y_e))
+        transformed_waypoints = list(zip(x_e, y_e, np.zeros_like(x_e)))
 
-        # 변환된 노드를 퍼블리시
-        self.publish_waypoints_marker(transformed_waypoints)
+        point_cloud = pc2.create_cloud_xyz32(
+            header=rospy.Header(frame_id='ego_car', stamp=self.timestamp),
+            points=transformed_waypoints
+        )
+
+        self.pub_waypoints.publish(point_cloud)
 
 def main():
     localizer = LocalizerHDMap()

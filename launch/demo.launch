@@ -19,6 +19,7 @@
     <rosparam command="load" file="$(find lidar_tracking)/config/params.yaml" />
     <param name="lidar_frame" value="$(arg lidar_frame)"/>
     <param name="target_frame" value="$(arg target_frame)"/>
+    <param name="world_frame" value="$(arg world_frame)"/>
   </node>
   
   <!-- <node name="$(anon rviz)" pkg="rviz" type="rviz" args="-d $(find lidar_tracking)/rviz/hesai.rviz"/> -->

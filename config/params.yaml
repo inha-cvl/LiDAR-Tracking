@@ -70,7 +70,7 @@ Tracking:
   crop_hd_map:
     number_front_node: 200
     number_back_node: 200
-    radius: 4.0
+    radius: 2.5
   track:
     invisibleCnt: 20
     deque:

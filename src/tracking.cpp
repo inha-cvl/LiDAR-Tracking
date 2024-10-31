@@ -26,15 +26,15 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
     cluster_bbox_array = *bba_msg;
 
     Tracking_->integrationBbox(cluster_bbox_array, deep_bbox_array, integration_bbox_array, t9);
-    Tracking_->cropHDMapBbox(integration_bbox_array, filtered_bbox_array, bba_msg->header.stamp, tf_buffer, t10);
-    Tracking_->tracking(filtered_bbox_array, track_bbox_array, track_text_array, bba_msg->header.stamp, t11);
+    Tracking_->tracking(integration_bbox_array, track_bbox_array, track_text_array, bba_msg->header.stamp, t11);
     // Tracking_->correctionBboxRelativeSpeed(track_bbox_array, bba_msg->header.stamp, ros::Time::now(), corrected_bbox_array, t12);
     
     if (checkTransform(tf_buffer, lidar_frame, target_frame)) {
         Tracking_->transformBbox(track_bbox_array, tf_buffer, transformed_bbox_array, t13);
-        Tracking_->correctionBboxTF(transformed_bbox_array, bba_msg->header.stamp, ros::Time::now(), tf_buffer, corrected_bbox_array, t13);
+        Tracking_->cropHDMapBbox(transformed_bbox_array, filtered_bbox_array, bba_msg->header.stamp, t10);
+        Tracking_->correctionBboxTF(filtered_bbox_array, bba_msg->header.stamp, ros::Time::now(), tf_buffer, corrected_bbox_array, t13);
         fixed_frame = target_frame;
-        output_bbox_array = transformed_bbox_array;
+        output_bbox_array = filtered_bbox_array;
     } else {
         fixed_frame = lidar_frame;
         output_bbox_array = track_bbox_array;
@@ -63,9 +63,9 @@ void callbackDeep(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
     deep_bbox_array = *bba_msg;
 }
 
-void callbackENU(const geometry_msgs::PoseStamped::ConstPtr &msg_in)
+void callbackWaypoints(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
 {
-    Tracking_->enuUpdate(msg_in);
+    Tracking_->updateWaypoints(cloud_msg);
 }
 
 int main(int argc, char** argv)
@@ -77,6 +77,7 @@ int main(int argc, char** argv)
 
     pnh.param<std::string>("lidar_frame", lidar_frame, "hesai_lidar");
     pnh.param<std::string>("target_frame", target_frame, "ego_car");
+    pnh.param<std::string>("world_frame", world_frame, "world");
 
     pub_track_box = pnh.advertise<jsk_recognition_msgs::BoundingBoxArray>("/mobinha/perception/lidar/track_box", 10);
     pub_track_text = pnh.advertise<visualization_msgs::MarkerArray>("/mobinha/visualize/visualize/track_text", 10);
@@ -87,7 +88,7 @@ int main(int argc, char** argv)
 
     ros::Subscriber sub_cluster_box = nh.subscribe("/cloud_segmentation/cluster_box", 1, callbackCluster);
     ros::Subscriber sub_deep_box = nh.subscribe("/deep_box", 1, callbackDeep);
-    // ros::Subscriber sub_enu = nh.subscribe("/best/pose", 10, callbackENU);
+    ros::Subscriber sub_waypoints = nh.subscribe("/waypoints", 1, callbackWaypoints);
 
     ros::spin();
     return 0;
