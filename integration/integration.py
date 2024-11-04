@@ -21,19 +21,13 @@ from utils import *
 
 package_path = roslib.packages.get_pkg_dir('lidar_tracking')
 dae_path = os.path.join(package_path, 'urdf/car.dae')  # car.dae 파일 경로 설정
-map_path = os.path.join(package_path, 'map/songdo.json')
+map_path = os.path.join(package_path, 'map/songdo-campus.json')
 
 # ioniq calibration
 t_gps_lidar = np.array([1.06, 0, 1.22])
 q_gps_lidar = rotate_quaternion_yaw((0, 0, 0, 1), -2.1)
 t_gps_ego = np.array([1.5275, 0, 0])
 q_gps_ego = rotate_quaternion_yaw((0, 0, 0, 1), -0.3)
-
-def gpsTime(gps_week_number, gps_week_milliseconds):
-    gps_epoch_unix = 315964800  # UNIX 타임스탬프로 GPS 에포크 시간 (1980-01-06)
-    gps_seconds = gps_week_number * 604800 + gps_week_milliseconds / 1000.0
-    gps_time = gps_epoch_unix + gps_seconds
-    return gps_time
 
 class Integration:
     def __init__(self):

@@ -10,8 +10,12 @@ import rospy
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Point
 
-# evaluation
-
+#evaluation
+def gpsTime(gps_week_number, gps_week_milliseconds):
+    gps_epoch_unix = 315964800  # UNIX 타임스탬프로 GPS 에포크 시간 (1980-01-06)
+    gps_seconds = gps_week_number * 604800 + gps_week_milliseconds / 1000.0
+    gps_time = gps_epoch_unix + gps_seconds
+    return gps_time
 
 def rotate_quaternion_yaw(quaternion, yaw_degrees):
     yaw_radians = math.radians(yaw_degrees)
