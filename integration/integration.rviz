@@ -3,8 +3,7 @@ Panels:
     Help Height: 78
     Name: Displays
     Property Tree Widget:
-      Expanded:
-        - /Near Node1
+      Expanded: ~
       Splitter Ratio: 0.5
     Tree Height: 719
   - Class: rviz/Selection
@@ -19,6 +18,7 @@ Panels:
   - Class: rviz/Views
     Expanded:
       - /Current View1
+      - /Current View1/Focal Point1
     Name: Views
     Splitter Ratio: 0.5
   - Class: rviz/Time
@@ -5762,7 +5762,7 @@ Visualization Manager:
       Marker Topic: /car_model
       Name: Car
       Namespaces:
-        car: true
+        ego_car: true
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -5785,7 +5785,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: Intensity
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: true
       Max Color: 255; 255; 255
       Min Color: 92; 53; 102
@@ -5800,7 +5800,7 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -5856,12 +5856,12 @@ Visualization Manager:
       only edge: false
       show coords: false
     - Class: jsk_rviz_plugin/BoundingBoxArray
-      Enabled: true
+      Enabled: false
       Name: Tracking
       Queue Size: 10
       Topic: /mobinha/perception/lidar/track_box
       Unreliable: false
-      Value: true
+      Value: false
       alpha: 0.800000011920929
       color: 239; 41; 41
       coloring: Flat color
@@ -5896,13 +5896,13 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 32.65692901611328
+      Distance: 36.87417221069336
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
-      Field of View: 0.7853981852531433
+      Field of View: 0.699999988079071
       Focal Point:
         X: 0
         Y: 0
@@ -5912,9 +5912,9 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.3847971558570862
+      Pitch: 0.10000000149011612
       Target Frame: ego_car
-      Yaw: 3.0703933238983154
+      Yaw: 3.140000104904175
     Saved: ~
 Window Geometry:
   Displays:

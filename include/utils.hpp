@@ -393,10 +393,10 @@ void transformMsgToEigen(const geometry_msgs::Transform &transform_msg, Eigen::A
                            transform_msg.rotation.y, transform_msg.rotation.z);
 }
 
-bool checkTransform(tf2_ros::Buffer &tf_buffer, const std::string &lidar_frame, const std::string &target_frame)
+bool checkTransform(tf2_ros::Buffer &tf_buffer, const std::string &frame_id, const std::string &child_frame_id)
 {
     try {
-        geometry_msgs::TransformStamped TransformStamped = tf_buffer.lookupTransform(target_frame, lidar_frame, ros::Time(0));
+        geometry_msgs::TransformStamped TransformStamped = tf_buffer.lookupTransform(frame_id, child_frame_id, ros::Time(0));
         return true;
     }
     catch (tf2::TransformException &ex) {

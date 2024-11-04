@@ -49,7 +49,6 @@ private:
 	float thr_velocity;
 	float thr_orientation;
 
-
 	cv::Mat m_matTransition;
 	cv::Mat m_matMeasurement;
 
@@ -58,7 +57,7 @@ private:
 
 	float m_thres_associationCost;
 
-	float dt = 0.05;
+	float dt = 0.1;
 	
 	// Global variables
 	vector<trackingStruct> vecTracks;

@@ -26,22 +26,23 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
     cluster_bbox_array = *bba_msg;
 
     Tracking_->integrationBbox(cluster_bbox_array, deep_bbox_array, integration_bbox_array, t9);
-    Tracking_->tracking(integration_bbox_array, track_bbox_array, track_text_array, bba_msg->header.stamp, t11);
     // Tracking_->correctionBboxRelativeSpeed(track_bbox_array, bba_msg->header.stamp, ros::Time::now(), corrected_bbox_array, t12);
     
-    if (checkTransform(tf_buffer, lidar_frame, target_frame)) {
-        Tracking_->transformBbox(track_bbox_array, tf_buffer, transformed_bbox_array, t13);
+    if (checkTransform(tf_buffer, world_frame, target_frame)) {
+        Tracking_->transformBbox(integration_bbox_array, tf_buffer, transformed_bbox_array, t13);
         Tracking_->cropHDMapBbox(transformed_bbox_array, filtered_bbox_array, bba_msg->header.stamp, t10);
         Tracking_->correctionBboxTF(filtered_bbox_array, bba_msg->header.stamp, ros::Time::now(), tf_buffer, corrected_bbox_array, t13);
         fixed_frame = target_frame;
         output_bbox_array = filtered_bbox_array;
     } else {
         fixed_frame = lidar_frame;
-        output_bbox_array = track_bbox_array;
+        output_bbox_array = integration_bbox_array;
     }
+
+    Tracking_->tracking(output_bbox_array, track_bbox_array, track_text_array, bba_msg->header.stamp, t11);
     
-    pub_track_box.publish(bba2msg(output_bbox_array, ros::Time::now(), fixed_frame));
-    pub_track_model.publish(bba2ma(output_bbox_array, ros::Time::now(), fixed_frame));
+    pub_track_box.publish(bba2msg(track_bbox_array, ros::Time::now(), fixed_frame));
+    pub_track_model.publish(bba2ma(track_bbox_array, ros::Time::now(), fixed_frame));
     pub_track_text.publish(ta2msg(track_text_array, ros::Time::now(), fixed_frame));
 
     total = ros::Time::now().toSec() - cluster_bbox_array.boxes[0].header.stamp.toSec();

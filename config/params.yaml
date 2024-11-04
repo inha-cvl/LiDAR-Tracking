@@ -49,7 +49,7 @@ Cloud_Segmentation:
     max:
       x: 100.0
       y: 40.0
-      z: 2.5
+      z: 0.3
     min:
       x: -100.0
       y: -40.0
@@ -70,9 +70,9 @@ Tracking:
   crop_hd_map:
     number_front_node: 200
     number_back_node: 200
-    radius: 2.5
+    radius: 1.8
   track:
-    invisibleCnt: 20
+    invisibleCnt: 10
     deque:
       number_velocity: 3
       number_orientation: 10
