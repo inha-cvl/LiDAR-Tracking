@@ -3,18 +3,15 @@ import copy
 from scipy.interpolate import interp1d
 from scipy.spatial import KDTree
 import numpy as np
-import pymap3d
 import json
 import math
 import tf
-import tf2_ros
 import rospy
-import roslib
-from sensor_msgs.msg import PointCloud2
-import sensor_msgs.point_cloud2 as pc2
-from novatel_oem7_msgs.msg import INSPVA
 from visualization_msgs.msg import Marker, MarkerArray
-from geometry_msgs.msg import Point, TransformStamped
+from geometry_msgs.msg import Point
+
+# evaluation
+
 
 def rotate_quaternion_yaw(quaternion, yaw_degrees):
     yaw_radians = math.radians(yaw_degrees)

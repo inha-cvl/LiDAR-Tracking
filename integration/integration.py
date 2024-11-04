@@ -1,10 +1,9 @@
 import os
-import copy
+import csv
 from scipy.interpolate import interp1d
 from scipy.spatial import KDTree
 import numpy as np
 import pymap3d
-import json
 import math
 import tf
 import tf2_ros
@@ -16,12 +15,25 @@ import sensor_msgs.point_cloud2 as pc2
 from novatel_oem7_msgs.msg import INSPVA
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Point, TransformStamped, Pose, Vector3, Quaternion
+from jsk_rviz_plugins.msg import OverlayText
 
 from utils import *
 
 package_path = roslib.packages.get_pkg_dir('lidar_tracking')
 dae_path = os.path.join(package_path, 'urdf/car.dae')  # car.dae 파일 경로 설정
 map_path = os.path.join(package_path, 'map/songdo.json')
+
+# ioniq calibration
+t_gps_lidar = np.array([1.06, 0, 1.22])
+q_gps_lidar = rotate_quaternion_yaw((0, 0, 0, 1), -2.1)
+t_gps_ego = np.array([1.5275, 0, 0])
+q_gps_ego = rotate_quaternion_yaw((0, 0, 0, 1), -0.3)
+
+def gpsTime(gps_week_number, gps_week_milliseconds):
+    gps_epoch_unix = 315964800  # UNIX 타임스탬프로 GPS 에포크 시간 (1980-01-06)
+    gps_seconds = gps_week_number * 604800 + gps_week_milliseconds / 1000.0
+    gps_time = gps_epoch_unix + gps_seconds
+    return gps_time
 
 class Integration:
     def __init__(self):
@@ -55,18 +67,27 @@ class Integration:
         self.static_br = tf2_ros.StaticTransformBroadcaster()
         static_transforms = [
             # ioniq
-            ((1.5275, 0.0, 0.0), rotate_quaternion_yaw((0, 0, 0, 1), -0.3), 'ego_car', 'gps'),
-            ((1.06, 0, 1.22), rotate_quaternion_yaw((0, 0, 0, 1), -2.1), 'hesai_lidar', 'gps')
-
-            # avente
-            # ((1.5275, -0.3, 0.0), rotate_quaternion_yaw((0, 0, 0, 1), 0.0), 'ego_car', 'gps'),
-            # ((1.06, 0, 1.22), rotate_quaternion_yaw((0, 0, 0, 1), -2.1), 'hesai_lidar', 'gps')
+            (t_gps_ego, q_gps_ego, 'ego_car', 'gps'),
+            (t_gps_lidar, q_gps_lidar, 'hesai_lidar', 'gps')
         ]
         self.publish_static_tfs(static_transforms)
+
+        # ego information
+        self.pub_ego_info = rospy.Publisher('/car_info', OverlayText, queue_size=1)
+
+        # evaluation
+        self.save_flag = False
+        self.csv_file = open('ioniq.csv', 'w', newline='')
+        self.csv_writer = csv.writer(self.csv_file)
+        self.csv_writer.writerow(['rostime', 'gpstime', 'world_x', 'world_y', 'azimuth', 'vx', 'vy'])
+        rospy.on_shutdown(self.shutdown_hook)  # 노드 종료 시 파일 닫기
 
         rospy.Subscriber('/novatel/oem7/inspva', INSPVA, self.novatel_cb)
 
         rospy.loginfo("Initialized")
+
+    def shutdown_hook(self):
+        self.csv_file.close()
 
     def egoCar(self):
         marker = Marker(
@@ -85,6 +106,23 @@ class Integration:
             )
         )
         return marker
+
+    def egoInfo(self, x, y, azimuth, vx, vy):
+        text = "Position:\nx: {:.2f}\ny: {:.2f}\nazimuth: {:.2f}\n\nSpeed:\nvx: {:.2f} m/s\nvy: {:.2f} m/s".format(
+            x, y, azimuth, vx, vy)
+        overlay_text = OverlayText()
+        overlay_text.action = OverlayText.ADD
+        overlay_text.width = 400
+        overlay_text.height = 200
+        overlay_text.left = 10  # 왼쪽에서부터의 위치
+        overlay_text.top = 10   # 위쪽에서부터의 위치
+        overlay_text.text_size = 14
+        overlay_text.line_width = 2
+        overlay_text.font = "DejaVu Sans Mono"
+        overlay_text.text = text
+        overlay_text.fg_color = ColorRGBA(0.0, 1.0, 0.0, 1.0)  # 녹색 글자
+        overlay_text.bg_color = ColorRGBA(0.0, 0.0, 0.0, 0.5)  # 반투명 검정 배경
+        return overlay_text
 
     def publish_static_tfs(self, transforms):
         static_transformStamped_vec = []
@@ -112,11 +150,10 @@ class Integration:
             msg.latitude, msg.longitude, 0, self.lmap.base_lla[0], self.lmap.base_lla[1], 0)
         self.roll = msg.roll
         self.pitch = msg.pitch
-        self.yaw = 90 - msg.azimuth + 360 if (-270 <= 90 - msg.azimuth <= -180) else 90 - msg.azimuth
-        # self.yaw = self.yaw - 0.3 # 설치 오차
+        self.azimuth = (90 - msg.azimuth) % 360
 
         quaternion = tf.transformations.quaternion_from_euler(
-            math.radians(self.roll), math.radians(self.pitch), math.radians(self.yaw))  # RPY
+            math.radians(self.roll), math.radians(self.pitch), math.radians(self.azimuth))  # RPY
         self.br.sendTransform(
             (self.x, self.y, self.z),
             (quaternion[0], quaternion[1],
@@ -125,9 +162,43 @@ class Integration:
             'gps',
             'world'
         )
-        
+
         self.pub_ego_car.publish(self.ego_car)
         self.update_local_waypoints(self.r)
+
+        # 원래의 azimuth 사용 (북쪽 기준 시계 방향 각도)
+        azimuth_rad_original = math.radians(msg.azimuth)
+
+        v_N = msg.north_velocity
+        v_E = msg.east_velocity
+
+        # 차량 좌표계로 변환하기 위한 회전 행렬의 요소 계산
+        cos_azimuth = math.cos(azimuth_rad_original)
+        sin_azimuth = math.sin(azimuth_rad_original)
+
+        # 차량 좌표계에서의 속도 성분 계산
+        vx = v_N * cos_azimuth + v_E * sin_azimuth
+        vy = -v_N * sin_azimuth + v_E * cos_azimuth
+
+        ego_info = self.egoInfo(self.x, self.y, self.azimuth, vx, vy)
+
+        # evaluation
+        if self.save_flag == True:
+            gps_time = gpsTime(msg.nov_header.gps_week_number, msg.nov_header.gps_week_milliseconds)
+            t_world_gps = [self.x, self.y, self.z]
+            q_world_gps = quaternion
+            R_world_gps = tf.transformations.quaternion_matrix(q_world_gps)[:3, :3]
+            t_gps_lidar_in_world = R_world_gps.dot(t_gps_lidar)
+            t_world_lidar = t_world_gps + t_gps_lidar_in_world
+            q_world_lidar = tf.transformations.quaternion_multiply(q_world_gps, q_gps_lidar)
+            _, _, yaw_lidar = tf.transformations.euler_from_quaternion(q_world_lidar)
+            azimuth_lidar = (math.degrees(yaw_lidar) + 360) % 360
+
+            self.csv_writer.writerow([self.timestamp, gps_time, t_world_lidar[0], t_world_lidar[1], azimuth_lidar, vx, vy])
+
+            ego_info = self.egoInfo(t_world_lidar[0], t_world_lidar[1], azimuth_lidar, vx, vy)
+
+        self.pub_ego_info.publish(ego_info)
 
     def build_waypoint_kdtree(self):
         all_waypoints = []
@@ -152,16 +223,16 @@ class Integration:
 
         nearby_waypoints = self.waypoints_np[indices]
 
-        yaw_vehicle = self.yaw
-        yaw_rad = math.radians(yaw_vehicle)
-        cos_yaw = math.cos(-yaw_rad)
-        sin_yaw = math.sin(-yaw_rad)
+        azimuth_vehicle = self.azimuth
+        azimuth_rad = math.radians(azimuth_vehicle)
+        cos_azimuth = math.cos(-azimuth_rad)
+        sin_azimuth = math.sin(-azimuth_rad)
 
         dx = nearby_waypoints[:, 0] - self.x
         dy = nearby_waypoints[:, 1] - self.y
 
-        x_e = dx * cos_yaw - dy * sin_yaw
-        y_e = dx * sin_yaw + dy * cos_yaw
+        x_e = dx * cos_azimuth - dy * sin_azimuth
+        y_e = dx * sin_azimuth + dy * cos_azimuth
 
         transformed_waypoints = list(zip(x_e, y_e, np.zeros_like(x_e)))
 
