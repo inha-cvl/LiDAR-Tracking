@@ -29,29 +29,29 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
     // Tracking_->correctionBboxRelativeSpeed(track_bbox_array, bba_msg->header.stamp, ros::Time::now(), corrected_bbox_array, t12);
     
     if (checkTransform(tf_buffer, world_frame, target_frame)) {
-        Tracking_->transformBbox(integration_bbox_array, tf_buffer, transformed_bbox_array, t13);
-        Tracking_->cropHDMapBbox(transformed_bbox_array, filtered_bbox_array, bba_msg->header.stamp, t10);
-        Tracking_->correctionBboxTF(filtered_bbox_array, bba_msg->header.stamp, ros::Time::now(), tf_buffer, corrected_bbox_array, t13);
+        Tracking_->transformBbox(integration_bbox_array, tf_buffer, transformed_bbox_array, t10);
+        Tracking_->cropHDMapBbox(transformed_bbox_array, filtered_bbox_array, bba_msg->header.stamp, t11);
+        Tracking_->tracking(filtered_bbox_array, track_bbox_array, track_text_array, bba_msg->header.stamp, t12);
+        Tracking_->correctionBboxTF(track_bbox_array, bba_msg->header.stamp, ros::Time::now(), tf_buffer, corrected_bbox_array, t13);
         fixed_frame = target_frame;
-        output_bbox_array = filtered_bbox_array;
+        output_bbox_array = corrected_bbox_array;
     } else {
+        Tracking_->tracking(integration_bbox_array, track_bbox_array, track_text_array, bba_msg->header.stamp, t12);
         fixed_frame = lidar_frame;
-        output_bbox_array = integration_bbox_array;
+        output_bbox_array = track_bbox_array;
     }
 
-    Tracking_->tracking(output_bbox_array, track_bbox_array, track_text_array, bba_msg->header.stamp, t11);
-    
-    pub_track_box.publish(bba2msg(track_bbox_array, ros::Time::now(), fixed_frame));
-    pub_track_model.publish(bba2ma(track_bbox_array, ros::Time::now(), fixed_frame));
+    pub_track_box.publish(bba2msg(output_bbox_array, ros::Time::now(), fixed_frame));
+    pub_track_model.publish(bba2ma(output_bbox_array, ros::Time::now(), fixed_frame));
     pub_track_text.publish(ta2msg(track_text_array, ros::Time::now(), fixed_frame));
 
     total = ros::Time::now().toSec() - cluster_bbox_array.boxes[0].header.stamp.toSec();
 
     std::cout << "\033[" << 18 << ";" << 30 << "H" << std::endl;
-    std::cout << "integration & crophdmap : " << t9+t10 << "sec" << std::endl;
-    std::cout << "tracking : " << t11 << "sec" << std::endl;
-    std::cout << "correction : " << t12 << "sec" << std::endl;
-    std::cout << "transform : " << t13 << "sec" << std::endl;
+    std::cout << "integration & crophdmap : " << t9+t10+t11 << "sec" << std::endl;
+    std::cout << "tracking : " << t12 << "sec" << std::endl;
+    std::cout << "correction : " << t13 << "sec" << std::endl;
+    // std::cout << "transform : " << t13 << "sec" << std::endl;
     std::cout << "total : " << total << " sec" << std::endl;
     std::cout << "fixed frame : " << fixed_frame << std::endl;
     

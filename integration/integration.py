@@ -21,13 +21,15 @@ from utils import *
 
 package_path = roslib.packages.get_pkg_dir('lidar_tracking')
 dae_path = os.path.join(package_path, 'urdf/car.dae')  # car.dae 파일 경로 설정
-map_path = os.path.join(package_path, 'map/songdo-campus.json')
+map_path = os.path.join(package_path, 'map/songdo.json')
 
 # ioniq calibration
 t_gps_lidar = np.array([1.06, 0, 1.22])
 q_gps_lidar = rotate_quaternion_yaw((0, 0, 0, 1), -2.1)
 t_gps_ego = np.array([1.5275, 0, 0])
 q_gps_ego = rotate_quaternion_yaw((0, 0, 0, 1), -0.3)
+t_lidar_camera = np.array([1.4, 0, -0.3])
+q_lidar_camera = rotate_quaternion_yaw((0, 0, 0, 1), 0.0)
 
 class Integration:
     def __init__(self):
@@ -47,7 +49,7 @@ class Integration:
         # pub_micro_lanelet_graph.publish(micro_lanelet_graph_viz)
 
         # waypoints
-        self.use_waypoints = False
+        self.use_waypoints = True
         self.r = 100.0
         self.build_waypoint_kdtree()
         self.pub_waypoints = rospy.Publisher('/waypoints', PointCloud2, queue_size=1)
@@ -62,7 +64,8 @@ class Integration:
         static_transforms = [
             # ioniq
             (t_gps_ego, q_gps_ego, 'ego_car', 'gps'),
-            (t_gps_lidar, q_gps_lidar, 'hesai_lidar', 'gps')
+            (t_gps_lidar, q_gps_lidar, 'hesai_lidar', 'gps'),
+            (t_lidar_camera, q_lidar_camera, 'camera', 'hesai_lidar')
         ]
         self.publish_static_tfs(static_transforms)
 
@@ -70,8 +73,9 @@ class Integration:
         self.pub_ego_info = rospy.Publisher('/car_info', OverlayText, queue_size=1)
 
         # evaluation
-        self.save_flag = False
-        self.csv_file = open('ioniq.csv', 'w', newline='')
+        self.save_flag = True
+        self.file_name = 'ioniq.csv'
+        self.csv_file = open(self.file_name, 'w', newline='')
         self.csv_writer = csv.writer(self.csv_file)
         self.csv_writer.writerow(['rostime', 'gpstime', 'world_x', 'world_y', 'azimuth', 'vx', 'vy'])
         rospy.on_shutdown(self.shutdown_hook)  # 노드 종료 시 파일 닫기
@@ -102,8 +106,9 @@ class Integration:
         return marker
 
     def egoInfo(self, x, y, azimuth, vx, vy):
-        text = "Position:\nx: {:.2f}\ny: {:.2f}\nazimuth: {:.2f}\n\nSpeed:\nvx: {:.2f} m/s\nvy: {:.2f} m/s".format(
-            x, y, azimuth, vx, vy)
+        # text = "Position:\nx: {:.2f}\ny: {:.2f}\nazimuth: {:.2f}\n\nSpeed:\nvx: {:.2f} m/s\nvy: {:.2f} m/s".format(x, y, azimuth, vx, vy)
+        v = math.sqrt(vx**2 + vy**2)
+        text = "Position:\nx: {:.2f}\ny: {:.2f}\nazimuth: {:.2f}\n\nSpeed: {:.2f} m/s".format(x, y, azimuth, v)
         overlay_text = OverlayText()
         overlay_text.action = OverlayText.ADD
         overlay_text.width = 400
@@ -158,26 +163,20 @@ class Integration:
         )
 
         self.pub_ego_car.publish(self.ego_car)
-        self.update_local_waypoints(self.r)
-
-        # 원래의 azimuth 사용 (북쪽 기준 시계 방향 각도)
-        azimuth_rad_original = math.radians(msg.azimuth)
-
-        v_N = msg.north_velocity
-        v_E = msg.east_velocity
-
+        
         # 차량 좌표계로 변환하기 위한 회전 행렬의 요소 계산
+        azimuth_rad_original = math.radians(msg.azimuth)
         cos_azimuth = math.cos(azimuth_rad_original)
         sin_azimuth = math.sin(azimuth_rad_original)
 
         # 차량 좌표계에서의 속도 성분 계산
-        vx = v_N * cos_azimuth + v_E * sin_azimuth
-        vy = -v_N * sin_azimuth + v_E * cos_azimuth
+        vx = msg.north_velocity * cos_azimuth + msg.east_velocity * sin_azimuth
+        vy = -msg.north_velocity * sin_azimuth + msg.east_velocity * cos_azimuth
 
-        ego_info = self.egoInfo(self.x, self.y, self.azimuth, vx, vy)
+        self.ego_info = self.egoInfo(self.x, self.y, self.azimuth, vx, vy)
 
         # evaluation
-        if self.save_flag == True:
+        if self.save_flag == False:
             gps_time = gpsTime(msg.nov_header.gps_week_number, msg.nov_header.gps_week_milliseconds)
             t_world_gps = [self.x, self.y, self.z]
             q_world_gps = quaternion
@@ -188,11 +187,15 @@ class Integration:
             _, _, yaw_lidar = tf.transformations.euler_from_quaternion(q_world_lidar)
             azimuth_lidar = (math.degrees(yaw_lidar) + 360) % 360
 
-            self.csv_writer.writerow([self.timestamp, gps_time, t_world_lidar[0], t_world_lidar[1], azimuth_lidar, vx, vy])
+            if self.file_name == "ioniq.csv": # ioniq 
+                self.csv_writer.writerow([self.timestamp.to_sec(), gps_time, t_world_lidar[0], t_world_lidar[1], azimuth_lidar, vx, vy])
+            elif self.file_name == "avente.csv": # avente
+                self.csv_writer.writerow([self.timestamp.to_sec(), gps_time, self.x, self.y, self.azimuth, vx, vy])
 
-            ego_info = self.egoInfo(t_world_lidar[0], t_world_lidar[1], azimuth_lidar, vx, vy)
+            self.ego_info = self.egoInfo(t_world_lidar[0], t_world_lidar[1], azimuth_lidar, vx, vy)
 
-        self.pub_ego_info.publish(ego_info)
+        self.pub_ego_info.publish(self.ego_info)
+        self.update_local_waypoints(self.r)
 
     def build_waypoint_kdtree(self):
         all_waypoints = []
