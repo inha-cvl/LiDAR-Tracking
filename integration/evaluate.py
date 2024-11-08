@@ -5,6 +5,18 @@ import math
 import numpy as np
 from shapely.geometry import Polygon
 
+# 매칭 파라미터 설정 (쉽게 수정 가능하도록 코드 상단에 배치)
+TIME_TOLERANCE = 0.01  # 타임스탬프 동기화 허용 오차 (초)
+POSITION_ERROR_THRESHOLD = 1.0  # 매칭되는 객체끼리의 최대 거리 (미터)
+MAX_HEADING_ERROR = 30.0
+DISTANCE_RANGES = [
+    (0, 20),
+    (20, 40),
+    (40, 60),
+    (60, 80),
+    (80, 100)
+]
+
 def read_csv_file(filename):
     data = []
     with open(filename, 'r') as csvfile:
@@ -13,7 +25,7 @@ def read_csv_file(filename):
             data.append(row)
     return data
 
-def synchronize_data(data1, data2, key='gpstime', tolerance=0.01):
+def synchronize_data(data1, data2, key='gpstime', tolerance=TIME_TOLERANCE):
     """
     공통 키(key)를 기준으로 두 데이터 세트를 주어진 오차 범위(tolerance) 내에서 동기화합니다.
     """
@@ -80,15 +92,15 @@ def compute_iou(boxA, boxB):
     iou = intersection / union
     return iou
 
-def evaluate(ioniq_data, avente_data, bounding_boxes_data, avente_specs):
-    # avente_specs: {'length': float, 'width': float}
+def evaluate(ioniq_data, i30_data, bounding_boxes_data, i30_specs):
+    # i30_specs: {'length': float, 'width': float}
 
-    # gpstime을 기준으로 ioniq와 avente 데이터 동기화
-    synchronized_data = synchronize_data(ioniq_data, avente_data, key='gpstime', tolerance=0.01)
+    # gpstime을 기준으로 ioniq와 i30 데이터 동기화
+    synchronized_data = synchronize_data(ioniq_data, i30_data, key='gpstime', tolerance=TIME_TOLERANCE)
 
     evaluation_results = []
 
-    for (ioniq_item, avente_item) in synchronized_data:
+    for (ioniq_item, i30_item) in synchronized_data:
         gpstime = float(ioniq_item['gpstime'])
         rostime = float(ioniq_item['rostime'])
 
@@ -99,27 +111,27 @@ def evaluate(ioniq_data, avente_data, bounding_boxes_data, avente_specs):
         ioniq_vx = float(ioniq_item['vx'])
         ioniq_vy = float(ioniq_item['vy'])
 
-        # avente 차량의 위치 및 방향
-        avente_x = float(avente_item['world_x'])
-        avente_y = float(avente_item['world_y'])
-        avente_azimuth = float(avente_item['azimuth'])
-        avente_vx = float(avente_item['vx'])
-        avente_vy = float(avente_item['vy'])
+        # i30 차량의 위치 및 방향
+        i30_x = float(i30_item['world_x'])
+        i30_y = float(i30_item['world_y'])
+        i30_azimuth = float(i30_item['azimuth'])
+        i30_vx = float(i30_item['vx'])
+        i30_vy = float(i30_item['vy'])
 
-        # avente 차량의 속도 계산
-        avente_speed = math.sqrt(avente_vx**2 + avente_vy**2)
+        # i30 차량의 속도 계산
+        i30_speed = math.sqrt(i30_vx**2 + i30_vy**2)
 
         # ioniq 차량의 속도 계산
         ioniq_speed = math.sqrt(ioniq_vx**2 + ioniq_vy**2)
 
-        # 상대 속도 계산 (avente 속도 벡터 - ioniq 속도 벡터)
-        relative_vx = avente_vx - ioniq_vx
-        relative_vy = avente_vy - ioniq_vy
+        # 상대 속도 계산 (i30 속도 벡터 - ioniq 속도 벡터)
+        relative_vx = i30_vx - ioniq_vx
+        relative_vy = i30_vy - ioniq_vy
         relative_speed = math.sqrt(relative_vx**2 + relative_vy**2)
 
-        # avente 차량의 ioniq 좌표계에서의 상대 위치 계산
-        dx = avente_x - ioniq_x
-        dy = avente_y - ioniq_y
+        # i30 차량의 ioniq 좌표계에서의 상대 위치 계산
+        dx = i30_x - ioniq_x
+        dy = i30_y - ioniq_y
 
         distance = math.sqrt(dx**2 + dy**2)  # 두 차량 사이의 거리 계산
 
@@ -129,17 +141,17 @@ def evaluate(ioniq_data, avente_data, bounding_boxes_data, avente_specs):
         rel_x = dx * cos_theta + dy * sin_theta
         rel_y = -dx * sin_theta + dy * cos_theta
 
-        # avente 차량의 ioniq 좌표계에서의 방향
-        rel_yaw = (avente_azimuth - ioniq_azimuth + 360) % 360
+        # i30 차량의 ioniq 좌표계에서의 방향
+        rel_yaw = (i30_azimuth - ioniq_azimuth + 360) % 360
 
-        # avente 차량의 Ground Truth 바운딩 박스 생성
-        gt_bbox = [rel_x, rel_y, avente_specs['length'], avente_specs['width'], rel_yaw]
+        # i30 차량의 Ground Truth 바운딩 박스 생성
+        gt_bbox = [rel_x, rel_y, i30_specs['length'], i30_specs['width'], rel_yaw]
 
         # 해당 rostime에 대한 바운딩 박스 찾기
         detected_bboxes = []
         for bbox_item in bounding_boxes_data:
             bbox_rostime = float(bbox_item['rostime'])
-            if abs(bbox_rostime - rostime) <= 0.01:  # 오차 범위 내에 있으면
+            if abs(bbox_rostime - rostime) <= TIME_TOLERANCE:  # 오차 범위 내에 있으면
                 bounding_boxes_json = bbox_item['bounding_boxes']
                 bboxes = json.loads(bounding_boxes_json)
                 for bbox in bboxes:
@@ -159,13 +171,13 @@ def evaluate(ioniq_data, avente_data, bounding_boxes_data, avente_specs):
                     })
                 break  # 일치하는 타임스탬프에 대해서만 처리
 
-        # 검출된 바운딩 박스 중 중심 거리가 2m 이내인 것만 선택
+        # 검출된 바운딩 박스 중 중심 거리가 설정된 거리 이내인 것만 선택
         filtered_bboxes = []
         for det_bbox in detected_bboxes:
             det_center_x = det_bbox['center_x']
             det_center_y = det_bbox['center_y']
             position_error = math.sqrt((det_center_x - gt_bbox[0])**2 + (det_center_y - gt_bbox[1])**2)
-            if position_error <= 2.0:
+            if position_error <= POSITION_ERROR_THRESHOLD:
                 filtered_bboxes.append((det_bbox, position_error))
 
         # 필터링된 바운딩 박스들에 대해 오차 계산
@@ -175,9 +187,8 @@ def evaluate(ioniq_data, avente_data, bounding_boxes_data, avente_specs):
                 det_bbox_list = [det_bbox['center_x'], det_bbox['center_y'], det_bbox['size_x'], det_bbox['size_y'], det_bbox['yaw_angle']]
                 iou = compute_iou(gt_bbox, det_bbox_list)
 
-                # 헤딩 오차 계산
+                # 헤딩 에러 계산 (절댓값 사용)
                 heading_error = abs(det_bbox['yaw_angle'] - gt_bbox[4])
-                heading_error = min(heading_error, 360 - heading_error)  # 최소 각도 차이로 계산
 
                 # 속도 오차 계산
                 lidar_relative_speed = det_bbox['value']  # 라이다로 측정한 상대 속도
@@ -190,7 +201,7 @@ def evaluate(ioniq_data, avente_data, bounding_boxes_data, avente_specs):
                     'distance': distance,
                     'position_error': position_error,
                     'iou': iou,
-                    'heading_error': heading_error,
+                    'heading_error': heading_error if heading_error <= MAX_HEADING_ERROR else None,
                     'speed_error': speed_error,
                     'gt_bbox': gt_bbox,
                     'detected_bbox': det_bbox
@@ -198,65 +209,69 @@ def evaluate(ioniq_data, avente_data, bounding_boxes_data, avente_specs):
 
                 evaluation_results.append(result)
         else:
-            # 매칭되는 바운딩 박스가 없는 경우
-            result = {
-                'gpstime': gpstime,
-                'rostime': rostime,
-                'distance': distance,
-                'position_error': None,
-                'iou': None,
-                'heading_error': None,
-                'speed_error': None,
-                'gt_bbox': gt_bbox,
-                'detected_bbox': None
-            }
-            evaluation_results.append(result)
+            # 매칭되는 바운딩 박스가 없는 경우 기록하지 않음
+            continue
 
-    # 각 지표별로 값을 수집
-    position_errors = [res['position_error'] for res in evaluation_results if res['position_error'] is not None]
-    ious = [res['iou'] for res in evaluation_results if res['iou'] is not None]
-    heading_errors = [res['heading_error'] for res in evaluation_results if res['heading_error'] is not None]
-    speed_errors = [res['speed_error'] for res in evaluation_results if res['speed_error'] is not None]
+    # 거리 범위별로 결과를 그룹화
+    range_results = {f"{r[0]}-{r[1]}": [] for r in DISTANCE_RANGES}
 
-    # 평균, 최대, 최소값 계산
-    def calculate_stats(values):
-        if values:
-            avg = sum(values) / len(values)
-            max_val = max(values)
-            min_val = min(values)
-            return avg, max_val, min_val
+    for res in evaluation_results:
+        distance = res['distance']
+        for r in DISTANCE_RANGES:
+            if r[0] <= distance < r[1]:
+                range_key = f"{r[0]}-{r[1]}"
+                range_results[range_key].append(res)
+                break
+
+    # 각 거리 범위별로 평균, 최대, 최소값 계산 및 출력
+    print("\nEvaluation Results by Distance Range:")
+    for range_key, results in range_results.items():
+        position_errors = [res['position_error'] for res in results]
+        ious = [res['iou'] for res in results]
+        heading_errors = [res['heading_error'] for res in results]
+        speed_errors = [res['speed_error'] for res in results]
+
+        def calculate_stats(values):
+            values = [v for v in values if v is not None]  # None 값 제거
+            if values:
+                avg = sum(values) / len(values)
+                max_val = max(values)
+                min_val = min(values)
+                return avg, max_val, min_val
+            else:
+                return None, None, None
+
+        position_error_stats = calculate_stats(position_errors)
+        iou_stats = calculate_stats(ious)
+        heading_error_stats = calculate_stats(heading_errors)
+        speed_error_stats = calculate_stats(speed_errors)
+
+        print(f"\nDistance Range: {range_key}m")
+        if position_error_stats[0] is not None:
+            print(f"Position Error - Avg: {position_error_stats[0]:.2f}, Max: {position_error_stats[1]:.2f}, Min: {position_error_stats[2]:.2f}")
+            print(f"IOU - Avg: {iou_stats[0]:.2f}, Max: {iou_stats[1]:.2f}, Min: {iou_stats[2]:.2f}")
+            print(f"Heading Error - Avg: {heading_error_stats[0]:.2f}, Max: {heading_error_stats[1]:.2f}, Min: {heading_error_stats[2]:.2f}")
+            print(f"Speed Error - Avg: {speed_error_stats[0]:.2f}, Max: {speed_error_stats[1]:.2f}, Min: {speed_error_stats[2]:.2f}")
         else:
-            return None, None, None
-
-    position_error_stats = calculate_stats(position_errors)
-    iou_stats = calculate_stats(ious)
-    heading_error_stats = calculate_stats(heading_errors)
-    speed_error_stats = calculate_stats(speed_errors)
-
-    # 결과 출력
-    print("\nEvaluation Results:")
-    print(f"Position Error - Avg: {position_error_stats[0]:.2f}, Max: {position_error_stats[1]:.2f}, Min: {position_error_stats[2]:.2f}")
-    print(f"IOU - Avg: {iou_stats[0]:.2f}, Max: {iou_stats[1]:.2f}, Min: {iou_stats[2]:.2f}")
-    print(f"Heading Error - Avg: {heading_error_stats[0]:.2f}, Max: {heading_error_stats[1]:.2f}, Min: {heading_error_stats[2]:.2f}")
-    print(f"Speed Error - Avg: {speed_error_stats[0]:.2f}, Max: {speed_error_stats[1]:.2f}, Min: {speed_error_stats[2]:.2f}")
+            print("No data available in this range.")
 
     return evaluation_results
 
 def main():
     # CSV 파일 읽기
-    ioniq_data = read_csv_file('ioniq.csv')
-    avente_data = read_csv_file('avente.csv')
+    ioniq_data = read_csv_file('ego.csv')
+    i30_data = read_csv_file('target.csv')
     bounding_boxes_data = read_csv_file('bounding_boxes.csv')
 
-    # avente 차량의 스펙 (미터 단위)
-    avente_specs = {
-        'length': 4.650,  # 전장 (미터)
-        'width': 1.825    # 전폭 (미터)
+    # i30 차량의 스펙 (미터 단위)
+    i30_specs = {
+        'length': 4.340,  # 전장 (미터)
+        'width': 1.795    # 전폭 (미터)
     }
 
-    evaluation_results = evaluate(ioniq_data, avente_data, bounding_boxes_data, avente_specs)
+    evaluation_results = evaluate(ioniq_data, i30_data, bounding_boxes_data, i30_specs)
 
-    # 평가 결과를 CSV 파일로 저장
+    # 평가 결과를 CSV 파일로 저장 (매칭된 결과만 저장)
     with open('evaluation_results.csv', 'w', newline='') as csvfile:
         fieldnames = ['gpstime', 'rostime', 'distance', 'position_error', 'iou', 'heading_error', 'speed_error']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
