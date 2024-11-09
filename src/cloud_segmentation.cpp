@@ -57,7 +57,7 @@ void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
     // pub_ground.publish(cloud2msg(groundCloud, input_stamp, lidar_frame));
 
     CloudSegmentation_->removalGroundPointCloud(cropCloud, nonGroundCloud, t4);
-    pub_non_ground.publish(cloud2msg(nonGroundCloud, input_stamp, lidar_frame));
+    // pub_non_ground.publish(cloud2msg(nonGroundCloud, input_stamp, lidar_frame));
 
     CloudSegmentation_->undistortPointCloud(nonGroundCloud, undistortionCloud, t5);
     pub_undistortion_cloud.publish(cloud2msg(undistortionCloud, input_stamp, lidar_frame));

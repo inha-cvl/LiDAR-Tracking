@@ -16,6 +16,27 @@ Cloud_Segmentation:
     ang_res_y: 0.3125 # Calculated as 40.0 / V_SCAN
     ang_bottom: 25
 
+  crop:
+    max:
+      x: 100.0
+      y: 40.0
+      z: 0.3
+    min:
+      x: -100.0
+      y: -40.0
+      z: -1.4
+    crop_ring:
+      enabled: false
+      ring: 2
+    crop_intensity:
+      enabled: false
+      intensity: 10.0
+    crop_hd_map:
+      radius: 5.0
+  
+  ground_removal:
+    fp_distance: 20
+
   downsampling:
     leaf_size:
       x: 0.2
@@ -44,24 +65,6 @@ Cloud_Segmentation:
       thresh_iou: 0.3
     L_shape_fitting:
       projection_range: 0.2
-
-  crop:
-    max:
-      x: 100.0
-      y: 40.0
-      z: 0.3
-    min:
-      x: -100.0
-      y: -40.0
-      z: -1.4
-    crop_ring:
-      enabled: false
-      ring: 2
-    crop_intensity:
-      enabled: false
-      intensity: 10.0
-    crop_hd_map:
-      radius: 5.0
 
 Tracking:
   integration:

@@ -483,7 +483,7 @@ void PatchWorkpp<PointT>::estimate_ground(
 
     // 1. Reflected Noise Removal (RNR)
     if (enable_RNR_) reflected_noise_removal(cloud_in, cloud_nonground);
-
+    
     t1 = ros::Time::now().toSec();
 
     // 2. Concentric Zone Model (CZM)

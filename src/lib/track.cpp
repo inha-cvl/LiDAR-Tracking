@@ -257,9 +257,9 @@ void Track::assignedTracksUpdate(const jsk_recognition_msgs::BoundingBoxArray &b
 
         vecTracks[idT].kf.correct(measure);
 		
-		vecTracks[idT].v = getVectorScale(vecTracks[idT].kf.statePost.at<float>(2), vecTracks[idT].kf.statePost.at<float>(3));
+		// vecTracks[idT].v = getVectorScale(vecTracks[idT].kf.statePost.at<float>(2), vecTracks[idT].kf.statePost.at<float>(3));
 		// vecTracks[idT].v = getVectorScale(vecTracks[idT].vx, vecTracks[idT].vy);
-		// vecTracks[idT].v = vecTracks[idT].kf.statePost.at<float>(2);
+		vecTracks[idT].v = vecTracks[idT].kf.statePost.at<float>(2);
 
 		// 이전 orientation들과 비교
         orientation_push_back(vecTracks[idT].orientation_deque, tf::getYaw(bboxArray.boxes[idD].pose.orientation));

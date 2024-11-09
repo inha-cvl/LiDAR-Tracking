@@ -14,6 +14,7 @@ import sensor_msgs.point_cloud2 as pc2
 from novatel_oem7_msgs.msg import INSPVA
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Point, TransformStamped, Pose, Vector3, Quaternion
+from jsk_recognition_msgs.msg import BoundingBox
 from jsk_rviz_plugins.msg import OverlayText
 
 from utils import *
@@ -28,7 +29,7 @@ t_gps_ego = np.array([1.5275, 0, 0])
 q_gps_ego = rotate_quaternion_yaw((0, 0, 0, 1), -0.3)
 # t_gps_lidar = np.array([1.06, 0, 1.22])
 t_gps_lidar = np.array([1.06, 0, 2.1]) # fitting hdmap
-q_gps_lidar = rotate_quaternion_yaw((0, 0, 0, 1), -2.1)
+q_gps_lidar = rotate_quaternion_yaw((0, 0, 0, 1), -1.5)
 t_gps_target = np.array([1.4, 0, 0])
 q_gps_target = rotate_quaternion_yaw((0, 0, 0, 1), 0.0)
 
@@ -62,8 +63,9 @@ class Integration:
         # ego car marker
         self.ego_car = self.Car('ego_car', True, (0.7,0.7,0.7,1.0))
         self.pub_ego_car = rospy.Publisher('/ego_model', Marker, queue_size=1)
-        self.target_car = self.Car('target_car', False, (0.0,1.0,0.0,1.0))
+        self.target_car = self.Car('target_car', False, (0.0,0.98,1.0,1.0))
         self.pub_target_car = rospy.Publisher('/target_model', Marker, queue_size=1)
+        self.pub_target_box = rospy.Publisher('/target_box', BoundingBox, queue_size=1)
         
         # calibration
         self.br = tf.TransformBroadcaster()
@@ -159,8 +161,8 @@ class Integration:
             math.radians(self.roll), math.radians(self.pitch), math.radians(self.azimuth))  # RPY
         self.br.sendTransform(
             (self.x, self.y, self.z),
-            (quaternion[0], quaternion[1],
-                quaternion[2], quaternion[3]),
+            # (quaternion[0], quaternion[1], quaternion[2], quaternion[3]),
+            (0, 0, quaternion[2], quaternion[3]),
             self.timestamp,
             'gps',
             'world'
@@ -249,8 +251,8 @@ class Integration:
             math.radians(roll), math.radians(pitch), math.radians(azimuth))  # RPY
         self.br.sendTransform(
             (x, y, z),
-            (quaternion[0], quaternion[1],
-                quaternion[2], quaternion[3]),
+            # (quaternion[0], quaternion[1], quaternion[2], quaternion[3]),
+            (0, 0, quaternion[2], quaternion[3]),
             timestamp,
             'gps2',
             'world'
@@ -258,23 +260,30 @@ class Integration:
 
         self.pub_target_car.publish(self.target_car)
 
-        # 차량 좌표계로 변환하기 위한 회전 행렬의 요소 계산
+        t_world_gps = [x, y, z]
+        q_world_gps = quaternion
+        R_world_gps = tf.transformations.quaternion_matrix(q_world_gps)[:3, :3]
+        t_gps_target_in_world = R_world_gps.dot(t_gps_target)
+        t_world_target = t_world_gps + t_gps_target_in_world
+        q_world_target = tf.transformations.quaternion_multiply(q_world_gps, q_gps_target)
+
+        target_box = BoundingBox()
+        target_box.header.stamp = timestamp
+        target_box.header.frame_id = "target_car"
+        target_box.pose.position.z = 1.06
+        target_box.dimensions = Vector3(x=4.34, y=1.795, z=1.455) # i30
+        self.pub_target_box.publish(target_box)
+
+        # 속도 계산
         azimuth_rad_original = math.radians(msg.azimuth)
         cos_azimuth = math.cos(azimuth_rad_original)
         sin_azimuth = math.sin(azimuth_rad_original)
-
-        # 차량 좌표계에서의 속도 성분 계산
         vx = msg.north_velocity * cos_azimuth + msg.east_velocity * sin_azimuth
         vy = -msg.north_velocity * sin_azimuth + msg.east_velocity * cos_azimuth
 
         if save_flag == True:
             gps_time = gpsTime(msg.nov_header.gps_week_number, msg.nov_header.gps_week_milliseconds)
-            t_world_gps = [x, y, z]
-            q_world_gps = quaternion
-            R_world_gps = tf.transformations.quaternion_matrix(q_world_gps)[:3, :3]
-            t_gps_target_in_world = R_world_gps.dot(t_gps_target)
-            t_world_target = t_world_gps + t_gps_target_in_world
-            q_world_target = tf.transformations.quaternion_multiply(q_world_gps, q_gps_target)
+            
             _, _, yaw_target = tf.transformations.euler_from_quaternion(q_world_target)
             azimuth_target = (math.degrees(yaw_target) + 360) % 360
             self.target_writer.writerow([timestamp.to_sec(), gps_time, t_world_target[0], t_world_target[1], azimuth_target, vx, vy])
