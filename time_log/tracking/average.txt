@@ -1,25 +1,15 @@
 tracking
-min : 0.0000268 sec
-max: 0.0009053 sec
-average: 0.0001841 sec
-
-transform
-min : 0.0000006 sec
-max: 0.0000181 sec
-average: 0.0000017 sec
+min : 0.0007234 sec
+max: 0.0262739 sec
+average: 0.0029319 sec
 
 integration
-min : 0.0000020 sec
-max: 0.0002303 sec
-average: 0.0000528 sec
+min : 0.0000030 sec
+max: 0.0002264 sec
+average: 0.0000500 sec
 
 correction
-min : 0.0000002 sec
-max: 0.0000138 sec
-average: 0.0000014 sec
-
-crophdmap
-min : 0.0001848 sec
-max: 0.0010344 sec
-average: 0.0004383 sec
+min : 0.0000029 sec
+max: 0.0000384 sec
+average: 0.0000066 sec
 

@@ -2,6 +2,12 @@
 # ex) int : 3, float : 3.0
 # 파라미터 순서랑 클래스 내에서 파라미터 변수 선언할 때 순서랑 맞춰줄 것?
 
+# 라이다 높이
+# kitti : 1.
+# nuscenes : 1.84m
+# songdo : 1.9m
+
+
 Public:
   map: "/map/songdo.json"
   lidar_frame: "hesai_lidar"
@@ -19,12 +25,12 @@ Cloud_Segmentation:
   crop:
     max:
       x: 100.0
-      y: 40.0
+      y: 100.0
       z: 0.3
     min:
       x: -100.0
-      y: -40.0
-      z: -1.4
+      y: -100.0
+      z: -1.7 # kitti , nuscenes 1.6, songdo 1.7
     crop_ring:
       enabled: false
       ring: 2
@@ -32,10 +38,10 @@ Cloud_Segmentation:
       enabled: false
       intensity: 10.0
     crop_hd_map:
-      radius: 5.0
+      radius: 1.5
   
   ground_removal:
-    fp_distance: 20
+    fp_distance: 7.0
 
   downsampling:
     leaf_size:
@@ -56,15 +62,15 @@ Cloud_Segmentation:
     adaptive:
       min_size: 10
       max_size: 2000
-      min_tolerance: 0.7
-      max_tolerance: 1.2
+      min_tolerance: 0.5 # 0.7 
+      max_tolerance: 1.0 # 1.2
       max_region_distance: 100
       number_region: 10
-      min_leaf_size: 0.2
-      max_leaf_size: 0.4
-      thresh_iou: 0.3
+      min_leaf_size: 0.2 # 0.2
+      max_leaf_size: 0.4 # 0.4
+      thresh_iou: 0.1
     L_shape_fitting:
-      projection_range: 0.2
+      projection_range: 0.3
 
 Tracking:
   integration:
@@ -73,11 +79,11 @@ Tracking:
   crop_hd_map:
     number_front_node: 200
     number_back_node: 200
-    radius: 1.8
+    radius: 2.6
   track:
-    invisibleCnt: 10
+    invisibleCnt: 5
     deque:
-      number_velocity: 3
+      number_velocity: 4
       number_orientation: 10
-      thresh_velocity: 30.0 # m/s
-      thresh_orientation: 30.0 # degree
+      thresh_velocity: 13.0 # m/s
+      thresh_orientation: 13.0 # degree

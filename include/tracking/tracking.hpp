@@ -292,14 +292,15 @@ void Tracking::correctionBboxRelativeSpeed(const jsk_recognition_msgs::BoundingB
         jsk_recognition_msgs::BoundingBox corrected_box = box; // 원래 box 복사
         corrected_box.header.stamp = cur_stamp;
 
-        if (corrected_box.header.seq > invisibleCnt && corrected_box.label == 1) {
+        if (corrected_box.header.seq > invisibleCnt / 2 && corrected_box.label == 1) {
+            
             double velocity = std::abs(box.value);
             double yaw = tf::getYaw(box.pose.orientation);
-            double delta_x = velocity * delta_time * cos(yaw);
-            double delta_y = velocity * delta_time * sin(yaw);
-            // 50km/h & 0.1sec -> 1.38m 
-            delta_x = std::copysign(std::min(std::abs(delta_x), 1.5), delta_x);
-            delta_y = std::copysign(std::min(std::abs(delta_y), 1.5), delta_y);
+            double delta_x = velocity * 0.2 * cos(yaw);
+            double delta_y = velocity * 0.2 * sin(yaw);
+            // 100km/h & 0.1sec -> 2.76m 
+            delta_x = std::copysign(std::min(std::abs(delta_x), 2.8), delta_x);
+            delta_y = std::copysign(std::min(std::abs(delta_y), 2.8), delta_y);
 
             corrected_box.pose.position.x += delta_x; // x 방향으로 이동
             corrected_box.pose.position.y += delta_y; // y 방향으로 이동                    
@@ -314,6 +315,67 @@ void Tracking::correctionBboxRelativeSpeed(const jsk_recognition_msgs::BoundingB
     saveTimeToFile(correction_time_log_path, time_taken);
 }
 
+void Tracking::correctionBboxTF(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, const ros::Time &input_stamp, 
+                                const ros::Time &cur_stamp, tf2_ros::Buffer &tf_buffer, 
+                                jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double& time_taken) 
+{
+    auto start = std::chrono::steady_clock::now();
+
+    output_bbox_array.boxes.clear();
+
+    geometry_msgs::TransformStamped transformStampedAtInput, transformStampedAtCur;
+
+    try {
+        // 로봇 좌표계에서 월드 좌표계로의 변환을 가져옵니다.
+        transformStampedAtInput = tf_buffer.lookupTransform(world_frame, target_frame, input_stamp);
+        transformStampedAtCur = tf_buffer.lookupTransform(world_frame, target_frame, cur_stamp);
+    } catch (tf2::TransformException &ex) {
+        output_bbox_array = input_bbox_array;
+        return;
+    }
+
+    tf2::Transform tfAtInput, tfAtCur, deltaTransform;
+    tf2::fromMsg(transformStampedAtInput.transform, tfAtInput);
+    tf2::fromMsg(transformStampedAtCur.transform, tfAtCur);
+
+    // 두 시점 간의 로봇의 움직임을 계산합니다.
+    deltaTransform = tfAtCur.inverse() * tfAtInput;
+
+    // deltaTransform을 geometry_msgs::TransformStamped로 변환합니다.
+    geometry_msgs::TransformStamped deltaTransformStamped;
+    deltaTransformStamped.header.stamp = input_stamp;
+    deltaTransformStamped.header.frame_id = target_frame;
+    deltaTransformStamped.child_frame_id = target_frame;
+    deltaTransformStamped.transform = tf2::toMsg(deltaTransform);
+
+    for (const auto &box : input_bbox_array.boxes) {
+        geometry_msgs::PoseStamped input_pose, transformed_pose;
+
+        input_pose.header = box.header;
+        input_pose.pose = box.pose;
+
+        // deltaTransform을 바운딩 박스에 적용합니다.
+        tf2::doTransform(input_pose, transformed_pose, deltaTransformStamped);
+
+        jsk_recognition_msgs::BoundingBox transformed_box;
+        transformed_box.header = box.header;
+        transformed_box.header.stamp = cur_stamp; // 보정된 시점으로 업데이트
+        transformed_box.pose = transformed_pose.pose;
+        transformed_box.dimensions = box.dimensions;
+        transformed_box.value = box.value;
+        transformed_box.label = box.label;
+        output_bbox_array.boxes.push_back(transformed_box);
+    }
+
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end - start;
+    time_taken = elapsed_seconds.count();
+    saveTimeToFile(correction_time_log_path, time_taken);
+}
+
+
+
+/*
 void Tracking::correctionBboxTF(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, const ros::Time &input_stamp, 
                               const ros::Time &cur_stamp, tf2_ros::Buffer &tf_buffer, 
                               jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double& time_taken) 
@@ -362,3 +424,4 @@ void Tracking::correctionBboxTF(const jsk_recognition_msgs::BoundingBoxArray &in
     time_taken = elapsed_seconds.count();
     saveTimeToFile(correction_time_log_path, time_taken);
 }
+*/

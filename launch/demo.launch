@@ -1,14 +1,14 @@
 <launch>
 
-<arg name="lidar_topic" default="/lidar_points"/>
-<arg name="lidar_frame" default="hesai_lidar"/>
+<arg name="lidar_topic" default="/lidar_points"/> <!-- /kitti/velo/pointcloud, /lidar_top -->
+<arg name="lidar_frame" default="hesai_lidar"/> <!-- velo_link, lidar_top -->
 <!-- <arg name="imu_topic" default="/ublox/imu_meas"/> -->
-<arg name="imu_topic" default="/imu/data_raw"/>
+<arg name="imu_topic" default="/imu/data_raw"/> <!-- /imu/data_raw /kitti/oxts/imu -->
 <arg name="target_frame" default="ego_car"/>
 <arg name="world_frame" default="world"/>
 
   <node name="cloud_segmentation" pkg="lidar_tracking" type="cloud_segmentation" output="screen">
-    <rosparam command="load" file="$(find lidar_tracking)/config/patchworkpp_hesai.yaml" />
+    <rosparam command="load" file="$(find lidar_tracking)/config/patchworkpp_origin.yaml" />
     <rosparam command="load" file="$(find lidar_tracking)/config/params.yaml" />
     <param name="lidar_topic" value="$(arg lidar_topic)"/>
     <param name="lidar_frame" value="$(arg lidar_frame)"/>

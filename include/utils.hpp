@@ -13,6 +13,7 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf/tf.h>
 
+#include "point_type/velodyne_point.h"
 #include "point_type/os_point.h"
 #include "point_type/hesai_point.h"
 
@@ -95,15 +96,23 @@ sensor_msgs::PointCloud2 cluster2msg(const std::vector<pcl::PointCloud<PointT>>&
     return output_msg;
 }
 
-jsk_recognition_msgs::BoundingBoxArray bba2msg(const jsk_recognition_msgs::BoundingBoxArray bba, 
+jsk_recognition_msgs::BoundingBoxArray bba2msg(const jsk_recognition_msgs::BoundingBoxArray &bba, 
                                                 const ros::Time &stamp, const std::string &frame_id)
 {
     jsk_recognition_msgs::BoundingBoxArray bba_ROS;
     bba_ROS.header.stamp = stamp;
     bba_ROS.header.frame_id = frame_id;
-    bba_ROS.boxes = bba.boxes;
+
+    for (const auto &box : bba.boxes) {
+        jsk_recognition_msgs::BoundingBox bbox = box;
+        bbox.header.stamp = stamp;
+        bbox.header.frame_id = frame_id;
+        bba_ROS.boxes.push_back(bbox);
+    }
+
     return bba_ROS;
 }
+
 
 visualization_msgs::MarkerArray ta2msg(const visualization_msgs::MarkerArray& ta, 
                                         const ros::Time &stamp, const std::string &frame_id)
@@ -143,15 +152,18 @@ visualization_msgs::MarkerArray bba2ma(const jsk_recognition_msgs::BoundingBoxAr
         if (bbox.label == 1)
         {
             marker.type = visualization_msgs::Marker::MESH_RESOURCE;
-            marker.mesh_resource = "package://lidar_tracking/urdf/car.dae";
-            marker.scale.x = 1.7;
-            marker.scale.y = 2.1;
-            marker.scale.z = 1.6;
-            marker.color.r = 0.5;
-            marker.color.g = 0.5;
-            marker.color.b = 0.5;
-            marker.color.a = 2.0;
+            marker.mesh_resource = "package://lidar_tracking/urdf/mesh_car.dae";
+            marker.scale.x = 1.0;
+            marker.scale.y = 1.0;
+            marker.scale.z = 1.0;
+            marker.color.r = 0.0;
+            marker.color.g = 0.98;
+            marker.color.b = 1.0;
+            marker.color.a = 0.7;
+
+            marker.pose.position.z -= 1.0;
         }
+
         else if (bbox.label == 2)
         {
             marker.type = visualization_msgs::Marker::SPHERE;

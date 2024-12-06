@@ -6,6 +6,10 @@ import json
 from jsk_recognition_msgs.msg import BoundingBoxArray
 from tf.transformations import euler_from_quaternion
 
+# bba_topic = '/cloud_segmentation/cluster_box'
+bba_topic = '/deep_box'
+#bba_topic = '/mobinha/perception/lidar/track_box'
+
 class BoundingBoxArraySaver:
     def __init__(self):
         rospy.init_node('bounding_box_array_saver')
@@ -17,10 +21,10 @@ class BoundingBoxArraySaver:
         self.csv_writer.writerow(['rostime', 'bounding_boxes'])
 
         # /track_box 토픽 구독
-        rospy.Subscriber('/deep_box', BoundingBoxArray, self.callback)
+        rospy.Subscriber(bba_topic, BoundingBoxArray, self.callback)
 
         rospy.on_shutdown(self.shutdown_hook)
-        rospy.loginfo("BoundingBoxArraySaver initialized and listening to /track_box")
+        rospy.loginfo("BoundingBoxArraySaver initialized and listening to " + bba_topic)
 
     def shutdown_hook(self):
         self.csv_file.close()
@@ -32,33 +36,22 @@ class BoundingBoxArraySaver:
         bounding_boxes_data = []
 
         for bbox in msg.boxes:
-            # 바운딩 박스 정보 추출
-            center_x = bbox.pose.position.x
-            center_y = bbox.pose.position.y
-            center_z = bbox.pose.position.z
-
-            size_x = bbox.dimensions.x
-            size_y = bbox.dimensions.y
-            size_z = bbox.dimensions.z
-
             # Quaternion -> Yaw 각도 변환
             orientation_q = bbox.pose.orientation
             quaternion = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
             _, _, yaw_angle_rad = euler_from_quaternion(quaternion)
             yaw_angle_deg = math.degrees(yaw_angle_rad)
 
-            # value 필드 추출 (상대 속도)
-            value = bbox.value
-
             bbox_data = {
-                'center_x': center_x,
-                'center_y': center_y,
-                'center_z': center_z,
-                'size_x': size_x,
-                'size_y': size_y,
-                'size_z': size_z,
+                'center_x': bbox.pose.position.x,
+                'center_y': bbox.pose.position.y,
+                'center_z': bbox.pose.position.z,
+                'size_x': bbox.dimensions.x,
+                'size_y': bbox.dimensions.y,
+                'size_z': bbox.dimensions.z,
                 'yaw_angle': yaw_angle_deg,
-                'value': value
+                'age': bbox.header.seq,
+                'value': bbox.value
             }
 
             bounding_boxes_data.append(bbox_data)

@@ -1,30 +1,30 @@
 undistortion
-min : 0.0017229 sec
-max: 0.0061694 sec
-average: 0.0038897 sec
+min : 0.0043515 sec
+max: 0.0058042 sec
+average: 0.0046995 sec
 
 crop
-min : 0.0010053 sec
-max: 0.0027233 sec
-average: 0.0013586 sec
+min : 0.0009876 sec
+max: 0.0029315 sec
+average: 0.0013004 sec
 
 lshape
-min : 0.0063591 sec
-max: 0.0260442 sec
-average: 0.0109990 sec
+min : 0.0064901 sec
+max: 0.0095862 sec
+average: 0.0080275 sec
 
 removalground
-min : 0.0058454 sec
-max: 0.0238962 sec
-average: 0.0131743 sec
+min : 0.0158917 sec
+max: 0.0268604 sec
+average: 0.0177339 sec
 
 clustering
-min : 0.0132017 sec
-max: 0.0554696 sec
-average: 0.0233487 sec
+min : 0.0092688 sec
+max: 0.0151339 sec
+average: 0.0107020 sec
 
 downsampling
-min : 0.0015879 sec
-max: 0.0145075 sec
-average: 0.0038347 sec
+min : 0.0031680 sec
+max: 0.0054169 sec
+average: 0.0038664 sec
 

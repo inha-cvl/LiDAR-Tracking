@@ -60,6 +60,7 @@ public:
         imu_cache.setCacheSize(1000);
         last_timestamp_imu = -1;
         Eigen::Quaterniond q(1, 0, 0, 0);
+        // Eigen::Quaterniond q(Eigen::AngleAxisd(-M_PI / 2, Eigen::Vector3d::UnitX()));
         Eigen::Vector3d t(0, 0, 0);
         T_i_l = Sophus::SE3d(q, t);
 
@@ -81,24 +82,28 @@ public:
         clearLogFile(lshape_time_log_path);
     }
 
-    void msgToPointCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg, pcl::PointCloud<PointT>& cloud);
+    void msgToPointCloud(const sensor_msgs::PointCloud2::ConstPtr &cloud_msg, pcl::PointCloud<PointT>& cloud);
     void updateImu(const sensor_msgs::Imu::ConstPtr &imu_msg);
     void projectPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double &time_taken);
     void convertPointCloudToImage(const pcl::PointCloud<PointT>& cloudIn, cv::Mat &imageOut, double &time_taken);
     void cropPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double &time_taken);
     void cropHDMapPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, 
                             tf2_ros::Buffer &tf_buffer, double &time_taken);
-    void removalGroundPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double &time_taken);
+    void removalGroundPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, 
+                                pcl::PointCloud<PointT>& ground, double &time_taken);
     void undistortPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double &time_taken);
     
     // CUDA-PointPillars
     void pcl2FloatArray(const pcl::PointCloud<PointT>& cloudIn, std::vector<float>& arrayOut, double &time_taken);
 
     void downsamplingPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<ClusterPointT>& cloudOut, double &time_taken);
-    void adaptiveClustering(const pcl::PointCloud<ClusterPointT>& cloudIn, std::vector<pcl::PointCloud<ClusterPointT>>& outputClusters, double &time_taken);
+    void adaptiveClustering(const pcl::PointCloud<PointT>& cloudIn, std::vector<pcl::PointCloud<ClusterPointT>>& outputClusters, double &time_taken);
     void voxelClustering(const pcl::PointCloud<PointT>& cloudIn, std::vector<pcl::PointCloud<ClusterPointT>>& outputClusters, double& time_taken);
     void fittingLShape(const std::vector<pcl::PointCloud<ClusterPointT>>& inputClusters,
                         jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken);
+
+    void fittingPCA(const std::vector<pcl::PointCloud<ClusterPointT>>& inputClusters, 
+                    jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double& time_taken);
 
     // TODO
     void adaptiveVoxelClustering(const pcl::PointCloud<PointT>& cloudIn, 
@@ -193,7 +198,7 @@ private:
 };
 
 template<typename PointT> inline
-void CloudSegmentation<PointT>::msgToPointCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg, pcl::PointCloud<PointT>& cloud)
+void CloudSegmentation<PointT>::msgToPointCloud(const sensor_msgs::PointCloud2::ConstPtr &cloud_msg, pcl::PointCloud<PointT>& cloud)
 {
     pcl::fromROSMsg(*cloud_msg, cloud);
     pre_stamp = cur_stamp;
@@ -428,7 +433,8 @@ void CloudSegmentation<PointT>::cropHDMapPointCloud(const pcl::PointCloud<PointT
 }
 
 template<typename PointT> inline
-void CloudSegmentation<PointT>::removalGroundPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, double& time_taken)
+void CloudSegmentation<PointT>::removalGroundPointCloud(const pcl::PointCloud<PointT>& cloudIn, pcl::PointCloud<PointT>& cloudOut, 
+                                                        pcl::PointCloud<PointT>& ground, double& time_taken)
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -443,7 +449,8 @@ void CloudSegmentation<PointT>::removalGroundPointCloud(const pcl::PointCloud<Po
     // 근거리 지면 오인식 필터링
     for (const auto& pt : groundCloud.points) {
         double range = sqrt(pt.x * pt.x + pt.y * pt.y);
-        if (range <= fp_distance && pt.z > roi_min_z) {
+
+        if (range <= fp_distance && pt.z > roi_min_z + 0.3) {
             nongroundCloud.push_back(pt);
         }
     }
@@ -455,6 +462,8 @@ void CloudSegmentation<PointT>::removalGroundPointCloud(const pcl::PointCloud<Po
     time_taken = elapsed_seconds.count();
     saveTimeToFile(removalground_time_log_path, time_taken);
 }
+
+// hesai
 
 template<typename PointT> inline
 void CloudSegmentation<PointT>::undistortPointCloud(const pcl::PointCloud<PointT>& cloudIn, 
@@ -533,6 +542,17 @@ void CloudSegmentation<PointT>::undistortPointCloud(const pcl::PointCloud<PointT
     saveTimeToFile(undistortion_time_log_path, time_taken);
 }
 
+// velodyne time 필드 없음
+/*
+template<typename PointT> inline
+void CloudSegmentation<PointT>::undistortPointCloud(const pcl::PointCloud<PointT>& cloudIn, 
+                                                    pcl::PointCloud<PointT>& cloudOut, double &time_taken)
+{
+    cloudOut = cloudIn;
+}
+*/
+// nuscenes에는 time 있는지 확인 하기
+
 // CUDA-PointPillars
 template<typename PointT> inline
 void CloudSegmentation<PointT>::pcl2FloatArray(const pcl::PointCloud<PointT>& cloudIn, std::vector<float>& arrayOut, double &time_taken)
@@ -551,7 +571,7 @@ void CloudSegmentation<PointT>::pcl2FloatArray(const pcl::PointCloud<PointT>& cl
         arrayOut[i * 4 + 0] = cloudIn.points[i].x;
         arrayOut[i * 4 + 1] = cloudIn.points[i].y;
         arrayOut[i * 4 + 2] = cloudIn.points[i].z;
-        arrayOut[i * 4 + 3] = cloudIn.points[i].intensity / 255.0f; // intensity 정규화
+        arrayOut[i * 4 + 3] = cloudIn.points[i].intensity / 255.0f;
     }
 
     auto end = std::chrono::steady_clock::now();
@@ -586,7 +606,7 @@ void CloudSegmentation<PointT>::downsamplingPointCloud(const pcl::PointCloud<Poi
 }
 
 template<typename PointT> inline
-void CloudSegmentation<PointT>::adaptiveClustering(const pcl::PointCloud<ClusterPointT>& cloudIn, 
+void CloudSegmentation<PointT>::adaptiveClustering(const pcl::PointCloud<PointT>& cloudIn, 
                                                 std::vector<pcl::PointCloud<ClusterPointT>>& outputClusters, double& time_taken) 
 {
     auto start = std::chrono::high_resolution_clock::now();
@@ -596,15 +616,18 @@ void CloudSegmentation<PointT>::adaptiveClustering(const pcl::PointCloud<Cluster
         return;
     }
 
+    pcl::PointCloud<ClusterPointT> tempCloud;
+    pcl::copyPointCloud(cloudIn, tempCloud);
+
     outputClusters.clear();
-    outputClusters.reserve(cloudIn.size());
+    outputClusters.reserve(tempCloud.size());
 
     // Divide the point cloud into nested circular regions
     std::vector<float> regions(max_region_distance, max_region_distance / number_region); // Example: Fill regions with a distance increment of 15m each
     std::vector<std::vector<int>> indices_array(max_region_distance);
 
-    for (int i = 0; i < cloudIn.size(); i++) {
-        float distance = cloudIn.points[i].x * cloudIn.points[i].x + cloudIn.points[i].y * cloudIn.points[i].y;
+    for (int i = 0; i < tempCloud.size(); i++) {
+        float distance = tempCloud.points[i].x * tempCloud.points[i].x + tempCloud.points[i].y * tempCloud.points[i].y;
         float range = 0.0;
         for (int j = 0; j < max_region_distance; j++) {
             if (distance > range * range && distance <= (range + regions[j]) * (range + regions[j]))
@@ -623,7 +646,7 @@ void CloudSegmentation<PointT>::adaptiveClustering(const pcl::PointCloud<Cluster
 
         pcl::PointCloud<ClusterPointT> cloudSegment;
         for (int index : indices_array[i]) {
-            cloudSegment.points.push_back(cloudIn.points[index]);
+            cloudSegment.points.push_back(tempCloud.points[index]);
         }
 
         pcl::search::KdTree<ClusterPointT> tree;
@@ -668,105 +691,6 @@ void CloudSegmentation<PointT>::adaptiveClustering(const pcl::PointCloud<Cluster
     saveTimeToFile(clustering_time_log_path, time_taken);
 }
 
-/*
-template<typename PointT> inline
-void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<PointT>& cloudIn, 
-                                                     std::vector<pcl::PointCloud<ClusterPointT>>& outputClusters, 
-                                                     double& time_taken) 
-{
-    auto start = std::chrono::high_resolution_clock::now();
-
-    if (cloudIn.points.empty()) {
-        std::cerr << "Input cloud is empty! <- adaptiveVoxelClustering" << std::endl;
-        return;
-    }
-
-    outputClusters.clear();
-    outputClusters.reserve(cloudIn.size());
-
-    // Convert the input cloud to ClusterPointT type
-    pcl::PointCloud<ClusterPointT> xyzCloud;
-    pcl::copyPointCloud(cloudIn, xyzCloud);
-
-    // 구간별 거리 단계 설정
-    std::vector<float> regions(number_region, max_region_distance / number_region); // 10m씩 증가하는 구간
-    std::vector<std::vector<int>> indices_array(number_region + 1); // 추가적으로 100m 이후를 위한 구간 추가
-
-    // 포인트 클라우드를 구간별로 분류
-    for (int i = 0; i < xyzCloud.size(); i++) {
-        float distance = std::sqrt(xyzCloud.points[i].x * xyzCloud.points[i].x + xyzCloud.points[i].y * xyzCloud.points[i].y);
-        if (distance > max_region_distance) {
-            // 100m 이후의 포인트는 마지막 구간에 배치
-            indices_array[number_region].push_back(i);
-        } else {
-
-            // 100m 이후의 포인트는 마지막 구간에 배치
-            if (distance > max_region_distance) {
-                indices_array[number_region].push_back(i);
-            } else {
-                // 구간을 계산하여 인덱스 선택
-                int region_index = static_cast<int>(distance / (max_region_distance / number_region));
-                indices_array[region_index].push_back(i);
-            }
-        }
-    }
-
-    // Iterate over each region and apply voxel grid filtering and clustering 
-    for (int i = 0; i <= number_region; i++) {
-        if (indices_array[i].empty()) continue;
-
-        pcl::PointCloud<ClusterPointT> cloudSegment;
-        for (int index : indices_array[i]) {
-            cloudSegment.points.push_back(xyzCloud.points[index]);
-        }
-
-        if (i != number_region) {
-            // 100m 이전의 구간 처리 (복셀화 적용)
-            pcl::VoxelGrid<ClusterPointT> voxel_grid_filter;
-            float leaf_size = max_leaf_size - (i * (max_leaf_size - min_leaf_size) / (number_region - 1)); // 구간별 leaf_size 계산
-            voxel_grid_filter.setLeafSize(leaf_size, leaf_size, leaf_size);
-            voxel_grid_filter.setInputCloud(boost::make_shared<pcl::PointCloud<ClusterPointT>>(cloudSegment));
-
-            pcl::PointCloud<ClusterPointT> downsampledCloud;
-            voxel_grid_filter.filter(downsampledCloud);
-            cloudSegment = downsampledCloud; // 다운샘플링된 클라우드로 업데이트
-        }
-
-        // Perform Euclidean clustering
-        pcl::search::KdTree<ClusterPointT> tree;
-        tree.setInputCloud(boost::make_shared<pcl::PointCloud<ClusterPointT>>(cloudSegment));
-
-        std::vector<pcl::PointIndices> cluster_indices;
-        pcl::EuclideanClusterExtraction<ClusterPointT> ec;
-        float tolerance = (i == number_region) ? max_tolerance : min_tolerance + (i * (max_tolerance - min_tolerance) / (number_region - 1)); // 구간별 tolerance 계산
-        ec.setClusterTolerance(tolerance);
-        ec.setMinClusterSize(adaptive_min_size);  // 원래 코드에 있던 adaptive_min_size 사용
-        ec.setMaxClusterSize(adaptive_max_size);  // 원래 코드에 있던 adaptive_max_size 사용
-        ec.setSearchMethod(boost::make_shared<pcl::search::KdTree<ClusterPointT>>(tree));
-        ec.setInputCloud(boost::make_shared<pcl::PointCloud<ClusterPointT>>(cloudSegment));
-        ec.extract(cluster_indices);
-
-        // Cluster size filtering and output storage
-        for (auto& indices : cluster_indices) {
-            pcl::PointCloud<ClusterPointT> cluster;
-            for (int idx : indices.indices) {
-                cluster.points.push_back(cloudSegment.points[idx]);
-            }
-            cluster.width = cluster.size();
-            cluster.height = 1;
-            cluster.is_dense = true;
-
-            outputClusters.push_back(cluster);
-        }
-    }
-
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-    time_taken = elapsed.count();
-    saveTimeToFile(clustering_time_log_path, time_taken);
-}
-*/
-
 template<typename PointT> inline
 void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<PointT>& cloudIn, 
                                                      std::vector<pcl::PointCloud<ClusterPointT>>& outputClusters, 
@@ -806,6 +730,7 @@ void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<Po
         }
 
         // 복셀화 적용
+        
         if (i != number_region) {
             auto downsample_start = std::chrono::steady_clock::now();
             
@@ -821,7 +746,7 @@ void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<Po
             auto downsample_end = std::chrono::steady_clock::now();
             total_downsampling_time += std::chrono::duration<double>(downsample_end - downsample_start).count();
         }
-
+        
         // 클러스터링 수행
         auto clustering_start = std::chrono::steady_clock::now();
 
@@ -864,7 +789,7 @@ void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<Po
 
 template<typename PointT> inline
 void CloudSegmentation<PointT>::fittingLShape(const std::vector<pcl::PointCloud<ClusterPointT>>& inputClusters, 
-                                           jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken) 
+                                           jsk_recognition_msgs::BoundingBoxArray& output_bbox_array, double& time_taken) 
 {
     auto start = std::chrono::steady_clock::now();
 
@@ -938,3 +863,109 @@ void CloudSegmentation<PointT>::fittingLShape(const std::vector<pcl::PointCloud<
     time_taken = elapsed_seconds.count();
     saveTimeToFile(lshape_time_log_path, time_taken);
 }
+
+template<typename PointT> inline
+void CloudSegmentation<PointT>::fittingPCA(const std::vector<pcl::PointCloud<ClusterPointT>>& inputClusters, 
+                                           jsk_recognition_msgs::BoundingBoxArray& output_bbox_array, double& time_taken)
+{
+    auto start = std::chrono::steady_clock::now();
+
+    output_bbox_array.boxes.clear();
+
+    if (inputClusters.empty()) {
+        std::cerr << "Input clusters is empty! <- fittingPCA" << std::endl;
+        return;
+    }
+
+    for (const pcl::PointCloud<ClusterPointT>& cluster : inputClusters)
+    {
+        if (cluster.points.empty())
+            continue;
+
+        // PCA를 위한 객체 생성
+        pcl::PCA<ClusterPointT> pca;
+        pca.setInputCloud(cluster.makeShared());
+
+        // 중심 좌표 계산
+        Eigen::Vector4f centroid;
+        pcl::compute3DCentroid(cluster, centroid);
+
+        // 고유값 및 고유벡터 계산
+        Eigen::Matrix3f eigen_vectors = pca.getEigenVectors();
+
+        // 변환 행렬 생성
+        Eigen::Matrix4f transform(Eigen::Matrix4f::Identity());
+        transform.block<3,3>(0,0) = eigen_vectors.transpose();
+        transform.block<3,1>(0,3) = -1.0f * (eigen_vectors.transpose() * centroid.head<3>());
+
+        // 점군 변환
+        pcl::PointCloud<ClusterPointT> transformedCloud;
+        pcl::transformPointCloud(cluster, transformedCloud, transform);
+
+        // 변환된 점군의 최소 및 최대 좌표 계산
+        ClusterPointT minPoint, maxPoint;
+        pcl::getMinMax3D(transformedCloud, minPoint, maxPoint);
+
+        // 바운딩 박스의 중심 및 크기 계산
+        Eigen::Vector3f mean_diag = 0.5f * (maxPoint.getVector3fMap() + minPoint.getVector3fMap());
+
+        Eigen::Quaternionf bbox_quaternion(eigen_vectors);
+        Eigen::Vector3f bbox_transform = eigen_vectors * mean_diag + centroid.head<3>();
+
+        // 바운딩 박스 생성
+        jsk_recognition_msgs::BoundingBox bbox;
+        bbox.header.stamp = cur_stamp;
+        bbox.header.frame_id = lidar_frame;
+        bbox.pose.position.x = bbox_transform.x();
+        bbox.pose.position.y = bbox_transform.y();
+        bbox.pose.position.z = bbox_transform.z();
+        bbox.dimensions.x = maxPoint.x - minPoint.x;
+        bbox.dimensions.y = maxPoint.y - minPoint.y;
+        bbox.dimensions.z = maxPoint.z - minPoint.z;
+        // bbox.pose.orientation.x = bbox_quaternion.x();
+        // bbox.pose.orientation.y = bbox_quaternion.y();
+        bbox.pose.orientation.x = 0;
+        bbox.pose.orientation.y = 0;
+        bbox.pose.orientation.z = bbox_quaternion.z();
+        bbox.pose.orientation.w = bbox_quaternion.w();
+
+        // 크기 필터 적용 (fittingLShape와 동일하게)
+        if (bbox.dimensions.x < filter_min_size_x || bbox.dimensions.x > filter_max_size_x ||
+            bbox.dimensions.y < filter_min_size_y || bbox.dimensions.y > filter_max_size_y ||
+            bbox.dimensions.z < filter_min_size_z || bbox.dimensions.z > filter_max_size_z) {
+            continue;
+        }
+
+        output_bbox_array.boxes.push_back(bbox);
+    }
+
+    // 겹치는 바운딩 박스 제거 (fittingLShape와 동일한 방식으로)
+    for (size_t i = 0; i < output_bbox_array.boxes.size(); ++i) {
+        for (size_t j = i + 1; j < output_bbox_array.boxes.size();) {
+            double overlap = getBBoxOverlap(output_bbox_array.boxes[j], output_bbox_array.boxes[i]);
+            if (overlap > thresh_iou) {
+                auto& box_i = output_bbox_array.boxes[i];
+                auto& box_j = output_bbox_array.boxes[j];
+
+                double volume_i = box_i.dimensions.x * box_i.dimensions.y * box_i.dimensions.z;
+                double volume_j = box_j.dimensions.x * box_j.dimensions.y * box_j.dimensions.z;
+
+                if (volume_i >= volume_j) {
+                    output_bbox_array.boxes.erase(output_bbox_array.boxes.begin() + j);
+                } else {
+                    output_bbox_array.boxes.erase(output_bbox_array.boxes.begin() + i);
+                    --i;
+                    break;
+                }
+            } else {
+                ++j;
+            }
+        }
+    }
+
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end - start;
+    time_taken = elapsed_seconds.count();
+    saveTimeToFile(lshape_time_log_path, time_taken);
+}
+

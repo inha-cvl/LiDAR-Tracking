@@ -23,36 +23,30 @@ package_path = roslib.packages.get_pkg_dir('lidar_tracking')
 dae_path = os.path.join(package_path, 'urdf/car.dae')
 map_path = os.path.join(package_path, 'map/songdo.json')
 
-save_flag = False # evaluation
-
-t_gps_ego = np.array([1.5275, 0, 0])
+t_gps_ego = np.array([1.527, 0, 0])
 q_gps_ego = rotate_quaternion_yaw((0, 0, 0, 1), -0.3)
 # t_gps_lidar = np.array([1.06, 0, 1.22])
-t_gps_lidar = np.array([1.06, 0, 2.1]) # fitting hdmap
+t_gps_lidar = np.array([1.06, 0, 2.1])  # fitting hdmap
 q_gps_lidar = rotate_quaternion_yaw((0, 0, 0, 1), -1.5)
 t_gps_target = np.array([1.4, 0, 0])
 q_gps_target = rotate_quaternion_yaw((0, 0, 0, 1), 0.0)
 
-static_transforms = [(t_gps_ego, q_gps_ego, 'ego_car', 'gps'), 
-                     (t_gps_lidar, q_gps_lidar, 'hesai_lidar', 'gps'),
-                     (t_gps_target, q_gps_target, 'target_car', 'gps2')]
+static_transforms = [
+    (t_gps_ego, q_gps_ego, 'ego_car', 'gps'),
+    (t_gps_lidar, q_gps_lidar, 'hesai_lidar', 'gps'),
+    (t_gps_target, q_gps_target, 'target_car', 'gps2')
+]
 
 class Integration:
     def __init__(self):
         rospy.init_node('Integration')
-        
+
         # lanelet
         self.interp_distance = 2.0
         self.lmap = LaneletMap(map_path, self.interp_distance)
         lanelet_map_viz = LaneletMapViz(self.lmap.lanelets, self.lmap.for_viz)
         pub_lanelet_map = rospy.Publisher('/lanelet_map', MarkerArray, queue_size=1, latch=True)
         pub_lanelet_map.publish(lanelet_map_viz)
-        
-        # microlanelet
-        # self.mlgraph = MicroLaneletGraph(self.lmap, 15.0)
-        # micro_lanelet_graph_viz = MicroLaneletGraphViz(self.lmap.lanelets, self.mlgraph.graph)
-        # pub_micro_lanelet_graph = rospy.Publisher('/micro_lanelet_graph', MarkerArray, queue_size=1, latch=True)
-        # pub_micro_lanelet_graph.publish(micro_lanelet_graph_viz)
 
         # waypoints
         self.use_waypoints = True
@@ -61,33 +55,30 @@ class Integration:
         self.pub_waypoints = rospy.Publisher('/waypoints', PointCloud2, queue_size=1)
 
         # ego car marker
-        self.ego_car = self.Car('ego_car', True, (0.7,0.7,0.7,1.0))
+        self.ego_color = (0.7, 0.7, 0.7, 1.0)  # 색상을 변수로 저장
+        self.target_color = (0.0, 0.98, 1.0, 0.7)  # 반투명으로 alpha 값을 0.5로 설정
+
+        self.ego_car = self.Car('ego_car', True, self.ego_color)
         self.pub_ego_car = rospy.Publisher('/ego_model', Marker, queue_size=1)
-        self.target_car = self.Car('target_car', False, (0.0,0.98,1.0,1.0))
+        self.target_car = self.Car('target_car', False, self.target_color)
         self.pub_target_car = rospy.Publisher('/target_model', Marker, queue_size=1)
         self.pub_target_box = rospy.Publisher('/target_box', BoundingBox, queue_size=1)
-        
+
+        # 텍스트 마커 퍼블리셔 추가
+        self.pub_ego_speed_marker = rospy.Publisher('/ego_speed', Marker, queue_size=1)
+        self.pub_target_speed_marker = rospy.Publisher('/target_speed', Marker, queue_size=1)
+
         # calibration
         self.br = tf.TransformBroadcaster()
         self.static_br = tf2_ros.StaticTransformBroadcaster()
-        
+
         self.publish_static_tfs(static_transforms)
 
         # ego information
         self.pub_ego_info = rospy.Publisher('/car_info', OverlayText, queue_size=1)
 
-        # evaluation
-        if save_flag == True:
-            self.ego_file = open("ego.csv", 'w', newline='')
-            self.target_file = open("target.csv", 'w', newline='')
-            self.ego_writer = csv.writer(self.ego_file)
-            self.target_writer = csv.writer(self.target_file)
-            self.ego_writer.writerow(['rostime', 'gpstime', 'world_x', 'world_y', 'azimuth', 'vx', 'vy'])
-            self.target_writer.writerow(['rostime', 'gpstime', 'world_x', 'world_y', 'azimuth', 'vx', 'vy'])
-            rospy.on_shutdown(self.shutdown_hook)  # 노드 종료 시 파일 닫기
-
         rospy.Subscriber('/novatel/oem7/inspva', INSPVA, self.novatel_cb)
-        rospy.Subscriber('/novatel/oem7/inspva2', INSPVA, self.novatel_cb2) # integration
+        rospy.Subscriber('/novatel/oem7/inspva2', INSPVA, self.novatel_cb2)  # integration
 
         rospy.loginfo("Initialized")
 
@@ -113,11 +104,11 @@ class Integration:
             )
         )
         return marker
-   
+
     def egoInfo(self, x, y, azimuth, vx, vy):
         # text = "Position:\nx: {:.2f}\ny: {:.2f}\nazimuth: {:.2f}\n\nSpeed:\nvx: {:.2f} m/s\nvy: {:.2f} m/s".format(x, y, azimuth, vx, vy)
         v = math.sqrt(vx**2 + vy**2)
-        text = "Position:\nx: {:.2f}\ny: {:.2f}\nazimuth: {:.2f}\n\nSpeed: {:.2f} m/s".format(x, y, azimuth, v)
+        text = "Position:\nx: {:.2f}\ny: {:.2f}\nazimuth: {:.2f}\n\nSpeed: {:.2f} km/h".format(x, y, azimuth, v*3.6)
         overlay_text = OverlayText()
         overlay_text.action = OverlayText.ADD
         overlay_text.width = 400
@@ -131,6 +122,25 @@ class Integration:
         overlay_text.fg_color = ColorRGBA(0.0, 1.0, 0.0, 1.0)  # 녹색 글자
         overlay_text.bg_color = ColorRGBA(0.0, 0.0, 0.0, 0.5)  # 반투명 검정 배경
         return overlay_text
+
+    def create_text_marker(self, frame_id, text, timestamp, position, color):
+        marker = Marker()
+        marker.header.frame_id = frame_id
+        marker.header.stamp = timestamp
+        marker.ns = frame_id + "_speed_text"
+        marker.id = 0
+        marker.type = Marker.TEXT_VIEW_FACING
+        marker.action = Marker.ADD
+        marker.pose.position = position
+        marker.pose.orientation.w = 1.0
+        marker.scale.z = 1.2  # 텍스트 크기 증가
+        marker.color.a = color[3]  # 투명도
+        marker.color.r = color[0]
+        marker.color.g = color[1]
+        marker.color.b = color[2]
+        marker.text = text
+        marker.lifetime = rospy.Duration(0.1)  # 필요에 따라 조정
+        return marker
 
     def publish_static_tfs(self, transforms):
         static_transformStamped_vec = []
@@ -146,7 +156,7 @@ class Integration:
             static_transformStamped.transform.rotation.z = rotation[2]
             static_transformStamped.transform.rotation.w = rotation[3]
             static_transformStamped_vec.append(static_transformStamped)
-        
+
         self.static_br.sendTransform(static_transformStamped_vec)
 
     def novatel_cb(self, msg):
@@ -161,15 +171,15 @@ class Integration:
             math.radians(self.roll), math.radians(self.pitch), math.radians(self.azimuth))  # RPY
         self.br.sendTransform(
             (self.x, self.y, self.z),
-            # (quaternion[0], quaternion[1], quaternion[2], quaternion[3]),
-            (0, 0, quaternion[2], quaternion[3]),
+            (quaternion[0], quaternion[1], quaternion[2], quaternion[3]),
+            # (0, 0, quaternion[2], quaternion[3]),
             self.timestamp,
             'gps',
             'world'
         )
 
         self.pub_ego_car.publish(self.ego_car)
-        
+
         # 차량 좌표계로 변환하기 위한 회전 행렬의 요소 계산
         azimuth_rad_original = math.radians(msg.azimuth)
         cos_azimuth = math.cos(azimuth_rad_original)
@@ -179,23 +189,18 @@ class Integration:
         vx = msg.north_velocity * cos_azimuth + msg.east_velocity * sin_azimuth
         vy = -msg.north_velocity * sin_azimuth + msg.east_velocity * cos_azimuth
 
-        # evaluation
-        if save_flag == True:
-            gps_time = gpsTime(msg.nov_header.gps_week_number, msg.nov_header.gps_week_milliseconds)
-            t_world_gps = [self.x, self.y, self.z]
-            q_world_gps = quaternion
-            R_world_gps = tf.transformations.quaternion_matrix(q_world_gps)[:3, :3]
-            t_gps_lidar_in_world = R_world_gps.dot(t_gps_lidar)
-            t_world_lidar = t_world_gps + t_gps_lidar_in_world
-            q_world_lidar = tf.transformations.quaternion_multiply(q_world_gps, q_gps_lidar)
-            _, _, yaw_lidar = tf.transformations.euler_from_quaternion(q_world_lidar)
-            azimuth_lidar = (math.degrees(yaw_lidar) + 360) % 360
- 
-            self.ego_writer.writerow([self.timestamp.to_sec(), gps_time, t_world_lidar[0], t_world_lidar[1], azimuth_lidar, vx, vy])
+        # 속도 크기 계산
+        v = math.sqrt(vx**2 + vy**2)
+
+        # 텍스트 마커 생성 및 퍼블리시
+        speed_text = "Speed: {:.2f} km/h".format(v*3.6)
+        position = Point(0, 0, 3.0)  # 차량 위 3미터 위치에 표시
+        marker = self.create_text_marker('ego_car', speed_text, self.timestamp, position, self.ego_color)
+        self.pub_ego_speed_marker.publish(marker)
 
         self.pub_ego_info.publish(self.egoInfo(self.x, self.y, self.azimuth, vx, vy))
         self.update_local_waypoints(self.r)
-    
+
     def build_waypoint_kdtree(self):
         all_waypoints = []
         for id_, lanelet in self.lmap.lanelets.items():
@@ -251,8 +256,8 @@ class Integration:
             math.radians(roll), math.radians(pitch), math.radians(azimuth))  # RPY
         self.br.sendTransform(
             (x, y, z),
-            # (quaternion[0], quaternion[1], quaternion[2], quaternion[3]),
-            (0, 0, quaternion[2], quaternion[3]),
+            (quaternion[0], quaternion[1], quaternion[2], quaternion[3]),
+            # (0, 0, quaternion[2], quaternion[3]),
             timestamp,
             'gps2',
             'world'
@@ -271,7 +276,7 @@ class Integration:
         target_box.header.stamp = timestamp
         target_box.header.frame_id = "target_car"
         target_box.pose.position.z = 1.06
-        target_box.dimensions = Vector3(x=4.34, y=1.795, z=1.455) # i30
+        target_box.dimensions = Vector3(x=4.34, y=1.795, z=1.455)  # i30
         self.pub_target_box.publish(target_box)
 
         # 속도 계산
@@ -281,12 +286,14 @@ class Integration:
         vx = msg.north_velocity * cos_azimuth + msg.east_velocity * sin_azimuth
         vy = -msg.north_velocity * sin_azimuth + msg.east_velocity * cos_azimuth
 
-        if save_flag == True:
-            gps_time = gpsTime(msg.nov_header.gps_week_number, msg.nov_header.gps_week_milliseconds)
-            
-            _, _, yaw_target = tf.transformations.euler_from_quaternion(q_world_target)
-            azimuth_target = (math.degrees(yaw_target) + 360) % 360
-            self.target_writer.writerow([timestamp.to_sec(), gps_time, t_world_target[0], t_world_target[1], azimuth_target, vx, vy])
+        # 속도 크기 계산
+        v = math.sqrt(vx**2 + vy**2)
+
+        # 텍스트 마커 생성 및 퍼블리시
+        speed_text = "Speed: {:.2f} km/h".format(v*3.6)
+        position = Point(0, 0, 3.0)  # 차량 위 3미터 위치에 표시
+        marker = self.create_text_marker('target_car', speed_text, timestamp, position, self.target_color)
+        self.pub_target_speed_marker.publish(marker)
 
 def main():
     integration = Integration()
