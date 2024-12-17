@@ -8,7 +8,7 @@ This is ROS package of LiDAR Tracking
 ## :open_file_folder: What's in this repository
 
 * ROS Noetic based LiDAR Tracking source code
-* Demo youtube link ([tracking.launch][youtubelink])
+* Demo youtube link ([youtube][youtubelink])
 
 [youtubelink]: https://www.youtube.com/watch?v=YP5AAO_Eq5Y
 
