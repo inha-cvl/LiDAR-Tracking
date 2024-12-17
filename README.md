@@ -5,7 +5,7 @@ This is ROS package of LiDAR Tracking
 
 <p align="center">
   <a href="https://youtu.be/YP5AAO_Eq5Y" target="_blank">
-    <img src="https://img.youtube.com/vi/YP5AAO_Eq5Y/0.jpg" alt="YouTube Video" width="600"/>
+    <img src="https://img.youtube.com/vi/YP5AAO_Eq5Y/0.jpg" alt="YouTube Video"/>
   </a>
 </p>
 
