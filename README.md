@@ -3,23 +3,19 @@
 
 This is ROS package of LiDAR Tracking
 
-<p align="center">
-  <a href="https://youtu.be/YP5AAO_Eq5Y" target="_blank">
-    <img src="https://img.youtube.com/vi/YP5AAO_Eq5Y/0.jpg" alt="YouTube Video" width="800" style="object-fit: cover; height: auto;"/>
-  </a>
-</p>
+<p align="center"><img src=pictures/integration.gif alt="animated" /></p>
 
 ## :open_file_folder: What's in this repository
 
 * ROS Noetic based LiDAR Tracking source code
-* Demo launch file ([tracking.launch][launchlink])
+* Demo youtube link ([tracking.launch][youtubelink])
 
-[launchlink]: https://github.com/inha-cvl/LiDAR-Tracking/tree/main/launch
+[youtubelink]: https://www.youtube.com/watch?v=YP5AAO_Eq5Y
 
 ## :package: Prerequisite packages
 You need to install ROS, PCL, Sophus, Glog, Eigen, JSK, Json...
 
-## :gear: How to build LiDAR-Tracking
+## :gear: How to build LiDAR-Tracking on Ubuntu 20.04
 
 ```bash
 $ mkdir -p ~/catkin_ws/src
@@ -33,9 +29,10 @@ $ catkin_make
 ```bash
 # Start Tracking with bag file
 $ roscore
-$ roslaunch lidar_tracking demo.launch
 $ rosparam set /use_sim_time true
-$ rosbag play kiapi.bag --clock
+$ roslaunch lidar_tracking tracking.launch
+$ roslaunch lidar_tracking integration.launch
+$ rosbag play songdo.bag --clock
 ```
 
 ## :pushpin: References
