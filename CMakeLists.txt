@@ -48,8 +48,7 @@ catkin_package(
         CATKIN_DEPENDS roscpp rospy std_msgs
 DEPENDS system_lib
 INCLUDE_DIRS include
-LIBRARIES opencv
-LIBRARIES track_lib
+LIBRARIES opencv track_lib
 )
 
 include_directories(
@@ -68,6 +67,11 @@ add_executable(tracking src/tracking.cpp)
 
 target_link_libraries(cloud_segmentation ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${JSONCPP_LIBRARIES} track_lib)
 target_link_libraries(tracking ${catkin_LIBRARIES} ${JSONCPP_LIBRARIES} track_lib)
+
+catkin_install_python(
+    PROGRAMS scripts/integration.py
+    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
 
 # ==== Install ====
 install(TARGETS cloud_segmentation tracking

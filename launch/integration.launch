@@ -1,0 +1,9 @@
+<launch>
+  
+  <node name="integration" pkg="lidar_tracking" type="integration.py" output="screen">
+    <rosparam command="load" file="$(find lidar_tracking)/config/params.yaml" />
+  </node>
+  
+  <node name="$(anon rviz)" pkg="rviz" type="rviz" args="-d $(find lidar_tracking)/rviz/integration.rviz"/>
+
+</launch>

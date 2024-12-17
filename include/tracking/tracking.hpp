@@ -11,8 +11,6 @@ public:
         nh_.getParam("Public/world_frame", world_frame);
         nh_.getParam("Tracking/integration/mode", mode);
         nh_.getParam("Tracking/integration/thresh_iou", thresh_iou);
-        nh_.getParam("Tracking/crop_hd_map/number_front_node", number_front_node);
-        nh_.getParam("Tracking/crop_hd_map/number_back_node", number_back_node);
         nh_.getParam("Tracking/crop_hd_map/radius", radius);
 
         nh_.getParam("Tracking/track/invisibleCnt", invisibleCnt);
@@ -118,24 +116,20 @@ void Tracking::updateWaypoints(const sensor_msgs::PointCloud2::ConstPtr &cloud_m
     waypoints_cache.add(cloud_msg);
 }
 
-
 void Tracking::integrationBbox(jsk_recognition_msgs::BoundingBoxArray &cluster_bbox_array, 
                                jsk_recognition_msgs::BoundingBoxArray &deep_bbox_array,
                                jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double& time_taken) 
 {
     auto start = std::chrono::steady_clock::now();
 
-    if (cluster_bbox_array.header.stamp.toSec() == last_timestamp_cluster) {
-        cluster_bbox_array.boxes.clear();
-    }
-    if (deep_bbox_array.header.stamp.toSec() == last_timestamp_deep) {
-        deep_bbox_array.boxes.clear();
-    }
+    // if (cluster_bbox_array.header.stamp.toSec() == last_timestamp_cluster) {
+    //     cluster_bbox_array.boxes.clear();
+    // }
+    // if (deep_bbox_array.header.stamp.toSec() == last_timestamp_deep) {
+    //     deep_bbox_array.boxes.clear();
+    // }
 
     output_bbox_array.boxes.clear();
-    
-    if (cluster_bbox_array.boxes.empty()) { cluster_bbox_array.boxes.clear(); }
-    if (deep_bbox_array.boxes.empty()) { deep_bbox_array.boxes.clear(); }
     
     // mode
     if (mode == 0) {

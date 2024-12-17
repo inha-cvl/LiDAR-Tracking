@@ -7,10 +7,10 @@
 # nuscenes : 1.84m
 # songdo : 1.9m
 
-
 Public:
   map: "/map/songdo.json"
   lidar_frame: "hesai_lidar"
+  ins_frame: "gps"
   target_frame: "ego_car"
   world_frame: "world"
 
@@ -24,12 +24,12 @@ Cloud_Segmentation:
 
   crop:
     max:
-      x: 100.0
-      y: 100.0
-      z: 0.3
+      x: 80.0
+      y: 80.0
+      z: 0.1
     min:
-      x: -100.0
-      y: -100.0
+      x: -80.0
+      y: -80.0
       z: -1.7 # kitti , nuscenes 1.6, songdo 1.7
     crop_ring:
       enabled: false
@@ -77,8 +77,6 @@ Tracking:
     mode: 0 # 0: integration, 1: cluster, 2: deep
     thresh_iou: 0.1
   crop_hd_map:
-    number_front_node: 200
-    number_back_node: 200
     radius: 2.6
   track:
     invisibleCnt: 5

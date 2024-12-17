@@ -37,6 +37,7 @@
 #include <message_filters/cache.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
+#include <message_filters/sync_policies/approximate_time.h>
 
 template<typename PointT>
 sensor_msgs::PointCloud2 cloud2msg(const pcl::PointCloud<PointT> &cloud, 
@@ -112,7 +113,6 @@ jsk_recognition_msgs::BoundingBoxArray bba2msg(const jsk_recognition_msgs::Bound
 
     return bba_ROS;
 }
-
 
 visualization_msgs::MarkerArray ta2msg(const visualization_msgs::MarkerArray& ta, 
                                         const ros::Time &stamp, const std::string &frame_id)
@@ -305,62 +305,6 @@ Eigen::Quaterniond calculateRotationBetweenStamps(const std::deque<sensor_msgs::
     return rotation_increment.unit_quaternion();
 }
 
-geometry_msgs::PoseStamped getENU(const message_filters::Cache<geometry_msgs::PoseStamped>& enu_cache, const ros::Time& input_stamp)
-{
-    // 가장 가까운 PoseStamped를 찾기 위한 변수 초기화
-    geometry_msgs::PoseStamped closest_pose;
-
-    // input_stamp 이전의 가장 가까운 PoseStamped
-    boost::shared_ptr<geometry_msgs::PoseStamped const> pose_before = enu_cache.getElemBeforeTime(input_stamp);
-    // input_stamp 이후의 가장 가까운 PoseStamped
-    boost::shared_ptr<geometry_msgs::PoseStamped const> pose_after = enu_cache.getElemAfterTime(input_stamp);
-
-    // 두 PoseStamped 중 input_stamp와 더 가까운 것을 선택
-    if (pose_before && pose_after)
-    {
-        // time difference 계산
-        ros::Duration diff_before = input_stamp - pose_before->header.stamp;
-        ros::Duration diff_after = pose_after->header.stamp - input_stamp;
-
-        // 더 가까운 PoseStamped를 선택
-        if (diff_before < diff_after)
-        {
-            closest_pose = *pose_before;
-        }
-        else
-        {
-            closest_pose = *pose_after;
-        }
-    }
-    // pose_before만 존재하는 경우
-    else if (pose_before)
-    {
-        closest_pose = *pose_before;
-    }
-    // pose_after만 존재하는 경우
-    else if (pose_after)
-    {
-        closest_pose = *pose_after;
-    }
-    else
-    {
-        // enu_cache에 적절한 값이 없는 경우
-        // 캐시 내에서 가장 최근 값을 가져오기 위해 마지막 요소를 찾음
-        boost::shared_ptr<geometry_msgs::PoseStamped const> last_pose = enu_cache.getElemAfterTime(ros::Time(0));
-        if (last_pose)
-        {
-            closest_pose = *last_pose;  // 가장 최근 데이터를 선택
-            ROS_WARN("No matching PoseStamped found. Returning the most recent data.");
-        }
-        else
-        {
-            ROS_WARN("No matching PoseStamped found in the cache, and no recent data available.");
-        }
-    }
-
-    return closest_pose;
-}
-
 std::vector<std::pair<float, float>> map_reader(std::string map_path)
 {
     Json::Value root;      
@@ -474,15 +418,15 @@ void clearLogFile(const std::string& file_path)
 // for experiment
 void saveTimeToFile(const std::string& timing_file, double time_taken) 
 {   
-    std::ofstream file(timing_file, std::ios::app);
+    // std::ofstream file(timing_file, std::ios::app);
 
-    if (!file.is_open()) {
-        std::cerr << "Error opening file: " << timing_file << std::endl;
-        return;
-    }
+    // if (!file.is_open()) {
+    //     std::cerr << "Error opening file: " << timing_file << std::endl;
+    //     return;
+    // }
 
-    file << time_taken << "\n";
-    file.close();
+    // file << time_taken << "\n";
+    // file.close();
 }
 
 double calculateAverageTime(const std::string& timing_file) 
@@ -515,53 +459,3 @@ double calculateAverageTime(const std::string& timing_file)
 
     return average;
 }
-
-/*
-// no use
-// L-shape Fitting 과 비교용
-void fittingPCA(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &inputClusters, const ros::Time &input_stamp, 
-                jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double &time_taken)
-{
-    auto start = std::chrono::steady_clock::now();
-
-    output_bbox_array.boxes.clear();
-
-    for (auto cluster : inputClusters)
-    {
-        pcl::PCA<pcl::PointXYZ> pca;
-        pcl::PointXYZ minPoint, maxPoint;
-        pcl::getMinMax3D(*cluster, minPoint, maxPoint);
-
-        // Find the oriented bounding box
-        // pca.setInputCloud(cluster);
-        // Eigen::Vector3f eigen_values = pca.getEigenValues();
-        // Eigen::Matrix3f eigen_vectors = pca.getEigenVectors();
-
-        // Create jsk_recognition_msgs::BoundingBox
-        jsk_recognition_msgs::BoundingBox bbox;
-        bbox.header.stamp = input_stamp;
-        bbox.header.frame_id = frameID;
-        bbox.pose.position.x = (minPoint.x + maxPoint.x) / 2.0;
-        bbox.pose.position.y = (minPoint.y + maxPoint.y) / 2.0;
-        bbox.pose.position.z = (minPoint.z + maxPoint.z) / 2.0;
-        bbox.dimensions.x = maxPoint.x - minPoint.x;
-        bbox.dimensions.y = maxPoint.y - minPoint.y;
-        bbox.dimensions.z = maxPoint.z - minPoint.z;
-        // Eigen::Quaternionf quat(eigen_vectors);
-        // bbox.pose.orientation.x = quat.x();
-        // bbox.pose.orientation.y = quat.y();
-        // bbox.pose.orientation.z = quat.z();
-        // bbox.pose.orientation.w = quat.w();
-        bbox.pose.orientation.x = 0;
-        bbox.pose.orientation.y = 0;
-        bbox.pose.orientation.z = 0;
-        bbox.pose.orientation.w = 1;
-
-        output_bbox_array.boxes.push_back(bbox);
-    }
-
-    auto end = std::chrono::steady_clock::now();
-    std::chrono::duration<double> elapsed_seconds = end - start;
-    time_taken = elapsed_seconds.count();
-}
-*/

@@ -105,10 +105,7 @@ public:
     void fittingPCA(const std::vector<pcl::PointCloud<ClusterPointT>>& inputClusters, 
                     jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double& time_taken);
 
-    // TODO
-    void adaptiveVoxelClustering(const pcl::PointCloud<PointT>& cloudIn, 
-                                                     std::vector<pcl::PointCloud<ClusterPointT>>& outputClusters, 
-                                                     double& time_taken);
+    void adaptiveVoxelClustering(const pcl::PointCloud<PointT>& cloudIn, std::vector<pcl::PointCloud<ClusterPointT>>& outputClusters, double& time_taken);
 
 private:
     ros::NodeHandle nh_;
@@ -553,7 +550,7 @@ void CloudSegmentation<PointT>::undistortPointCloud(const pcl::PointCloud<PointT
 */
 // nuscenes에는 time 있는지 확인 하기
 
-// CUDA-PointPillars
+// OpenPCDet
 template<typename PointT> inline
 void CloudSegmentation<PointT>::pcl2FloatArray(const pcl::PointCloud<PointT>& cloudIn, std::vector<float>& arrayOut, double &time_taken)
 {

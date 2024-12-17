@@ -1,19 +1,24 @@
+
 # LiDAR Tracking
 
 This is ROS package of LiDAR Tracking
 
-<p align="center"><img src=pictures/demo.gif alt="animated" /></p>
+<p align="center">
+  <a href="https://youtu.be/YP5AAO_Eq5Y" target="_blank">
+    <img src="https://img.youtube.com/vi/YP5AAO_Eq5Y/0.jpg" alt="YouTube Video" width="600"/>
+  </a>
+</p>
 
 
 ## :open_file_folder: What's in this repository
 
 * ROS Noetic based LiDAR Tracking source code
-* Demo launch file ([demo.launch][launchlink])
+* Demo launch file ([tracking.launch][launchlink])
 
 [launchlink]: https://github.com/inha-cvl/LiDAR-Tracking/tree/main/launch
 
 ## :package: Prerequisite packages
-You need to install ROS, PCL, Sophus, Eigen, JSK, Json...
+You need to install ROS, PCL, Sophus, Glog, Eigen, JSK, Json...
 
 ## :gear: How to build LiDAR-Tracking
 
@@ -52,4 +57,3 @@ If you have any question, don't be hesitate let us know!
 * [Gyuseok Lee][link] :envelope: (rbtjr98@inha.edu)
 
 [link]: https://github.com/Lee-Gyu-Seok
-

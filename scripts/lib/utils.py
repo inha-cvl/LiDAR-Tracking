@@ -1,14 +1,14 @@
-import os
 import copy
-from scipy.interpolate import interp1d
-from scipy.spatial import KDTree
-import numpy as np
 import json
 import math
-import tf
+import numpy as np
 import rospy
+import tf
+from scipy.interpolate import interp1d
+from geometry_msgs.msg import Point, TransformStamped, Pose, Vector3, Quaternion
+from jsk_rviz_plugins.msg import OverlayText
+from std_msgs.msg import Header, ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
-from geometry_msgs.msg import Point
 
 #evaluation
 def gpsTime(gps_week_number, gps_week_milliseconds):
@@ -264,6 +264,109 @@ def find_nearest_idx(pts, pt):
             min_idx = idx
 
     return min_idx
+
+def create_car_marker(frame_id, use_embedded_materials, color, dae_path):
+    return Marker(
+        header=Header(frame_id=frame_id),
+        ns=frame_id,
+        id=0,
+        type=Marker.MESH_RESOURCE,
+        mesh_resource="file://" + dae_path,
+        mesh_use_embedded_materials=use_embedded_materials,
+        action=Marker.ADD,
+        lifetime=rospy.Duration(0.05),
+        scale=Vector3(x=2.0, y=2.0, z=2.0),
+        color=ColorRGBA(*color),
+        pose=Pose(
+            position=Point(x=0, y=0, z=1.0),
+            orientation=Quaternion(*tf.transformations.quaternion_from_euler(0, 0, math.radians(90)))
+        )
+    )
+
+def create_ego_info_overlay(x, y, azimuth, vx, vy):
+    v = math.sqrt(vx**2 + vy**2)
+    text = ("Position:\nx: {:.2f}\ny: {:.2f}\nazimuth: {:.2f}\n\n"
+            "Speed: {:.2f} km/h").format(x, y, azimuth, v*3.6)
+
+    overlay_text = OverlayText()
+    overlay_text.action = OverlayText.ADD
+    overlay_text.width = 400
+    overlay_text.height = 200
+    overlay_text.left = 10
+    overlay_text.top = 10
+    overlay_text.text_size = 14
+    overlay_text.line_width = 2
+    overlay_text.font = "DejaVu Sans Mono"
+    overlay_text.text = text
+    overlay_text.fg_color = ColorRGBA(0.0, 1.0, 0.0, 1.0)
+    overlay_text.bg_color = ColorRGBA(0.0, 0.0, 0.0, 0.5)
+    return overlay_text
+
+def create_text_marker(frame_id, text, timestamp, position, color):
+    marker = Marker()
+    marker.header.frame_id = frame_id
+    marker.header.stamp = timestamp
+    marker.ns = frame_id + "_speed_text"
+    marker.id = 0
+    marker.type = Marker.TEXT_VIEW_FACING
+    marker.action = Marker.ADD
+    marker.pose.position = position
+    marker.pose.orientation.w = 1.0
+    marker.scale.z = 1.2
+    marker.color = ColorRGBA(color[0], color[1], color[2], color[3])
+    marker.text = text
+    marker.lifetime = rospy.Duration(0.1)
+    return marker
+
+def publish_static_tfs(static_br, transforms):
+    static_transform_stamped_vec = []
+    for translation, rotation, child_frame, parent_frame in transforms:
+        st = TransformStamped()
+        st.header.frame_id = parent_frame
+        st.child_frame_id = child_frame
+        st.transform.translation.x = translation[0]
+        st.transform.translation.y = translation[1]
+        st.transform.translation.z = translation[2]
+        st.transform.rotation.x = rotation[0]
+        st.transform.rotation.y = rotation[1]
+        st.transform.rotation.z = rotation[2]
+        st.transform.rotation.w = rotation[3]
+        static_transform_stamped_vec.append(st)
+    static_br.sendTransform(static_transform_stamped_vec)
+
+def calculate_velocity_and_heading(msg):
+    # INS 메세지에서 속도와 헤딩을 계산하는 유틸 함수
+    azimuth_rad_original = math.radians(msg.azimuth)
+    cos_azimuth = math.cos(azimuth_rad_original)
+    sin_azimuth = math.sin(azimuth_rad_original)
+
+    vx = msg.north_velocity * cos_azimuth + msg.east_velocity * sin_azimuth
+    vy = -msg.north_velocity * sin_azimuth + msg.east_velocity * cos_azimuth
+    v = math.sqrt(vx**2 + vy**2)
+    return vx, vy, v
+
+def query_local_waypoints(kdtree, waypoints_np, x, y, azimuth, r):
+    if kdtree is None:
+        return None
+
+    indices = kdtree.query_ball_point([x, y], r)
+    if not indices:
+        return None
+
+    nearby_waypoints = waypoints_np[indices]
+
+    azimuth_rad = math.radians(azimuth)
+    cos_azimuth = math.cos(-azimuth_rad)
+    sin_azimuth = math.sin(-azimuth_rad)
+
+    dx = nearby_waypoints[:, 0] - x
+    dy = nearby_waypoints[:, 1] - y
+
+    x_e = dx * cos_azimuth - dy * sin_azimuth
+    y_e = dx * sin_azimuth + dy * cos_azimuth
+
+    transformed_waypoints = list(zip(x_e, y_e, np.zeros_like(x_e)))
+    return transformed_waypoints
 
 class QuadraticSplineInterpolate:
     def __init__(self, x, y):
