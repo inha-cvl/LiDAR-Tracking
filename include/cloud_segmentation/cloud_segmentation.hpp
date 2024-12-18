@@ -14,8 +14,8 @@ public:
         nh_.getParam("Public/world_frame", world_frame);
         nh_.getParam("Cloud_Segmentation/lidar_settings/V_SCAN", V_SCAN);
         nh_.getParam("Cloud_Segmentation/lidar_settings/H_SCAN", H_SCAN);
-        nh_.getParam("Cloud_Segmentation/lidar_settings/ang_res_x", ang_res_x);
-        nh_.getParam("Cloud_Segmentation/lidar_settings/ang_res_y", ang_res_y);
+        nh_.getParam("Cloud_Segmentation/lidar_settings/resolution_x", resolution_x);
+        nh_.getParam("Cloud_Segmentation/lidar_settings/resolution_y", resolution_y);
         nh_.getParam("Cloud_Segmentation/lidar_settings/ang_bottom", ang_bottom);
         nh_.getParam("Cloud_Segmentation/crop/max/x", roi_max_x);
         nh_.getParam("Cloud_Segmentation/crop/max/y", roi_max_y);
@@ -116,8 +116,8 @@ private:
     std::vector<std::pair<float, float>> global_path;
     int V_SCAN; // Vertical scan lines
     int H_SCAN; // Horizontal scan points per line
-    float ang_res_x; // Angular resolution in x direction (degrees)
-    float ang_res_y; // Angular resolution in y direction (degrees)
+    float resolution_x; // Angular resolution in x direction (degrees)
+    float resolution_y; // Angular resolution in y direction (degrees)
     int ang_bottom; // Bottom angle (degrees)
 
     // Region of Interest (ROI) settings
@@ -222,7 +222,7 @@ void CloudSegmentation<PointT>::projectPointCloud(const pcl::PointCloud<PointT>&
     cloudOut.clear();
     cloudOut.points.resize(V_SCAN * H_SCAN);
 
-    // Pandar64의 각 채널 수직 각도 설정
+    // Pandar64
     std::vector<float> channelAngles = {14.882, 11.032, 8.059, 5.057, 3.04, 2.028, 1.86, 1.688, 1.522, 1.351, 1.184, 1.013,
                                         0.846, 0.675, 0.508, 0.337, 0.169, 0.000, -0.169, -0.337, -0.508, -0.675, -0.845, -1.013,
                                         -1.184, -1.351, -1.522, -1.688, -1.86, -2.028, -2.198, -2.365, -2.536, -2.7, -2.873, -3.04,
@@ -251,7 +251,7 @@ void CloudSegmentation<PointT>::projectPointCloud(const pcl::PointCloud<PointT>&
 
         // 수평 각도 계산 및 인덱스
         float horizonAngle = atan2(outPoint.x, outPoint.y) * 180 / M_PI;
-        size_t columnIdn = static_cast<size_t>(-round((horizonAngle - 90.0) / ang_res_x) + H_SCAN / 2);
+        size_t columnIdn = static_cast<size_t>(-round((horizonAngle - 90.0) / resolution_x) + H_SCAN / 2);
 
         if (columnIdn >= H_SCAN)
             columnIdn -= H_SCAN;

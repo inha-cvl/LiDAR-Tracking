@@ -15,7 +15,7 @@ This is ROS package of LiDAR Tracking
 ## :package: Prerequisite packages
 You need to install ROS, PCL, Sophus, Glog, Eigen, JSK, Json...
 
-## :gear: How to build LiDAR-Tracking on Ubuntu 20.04
+## :gear: How to build LiDAR-Tracking
 
 ```bash
 $ mkdir -p ~/catkin_ws/src
@@ -26,11 +26,16 @@ $ catkin_make
 
 ## :runner: To run the demo
 
+* Download bag ([bagfile][onedrivelink])
+
+[onedrivelink]: https://1drv.ms/u/s!At4eTVNRwillgdsABY-z8AVEqmvoxg?e=PCqjYE
+
 ```bash
 # Start Tracking with bag file
 $ roscore
 $ rosparam set /use_sim_time true
 $ roslaunch lidar_tracking tracking.launch
+$ roslaunch openpcdet 3d_object_detector.launch # Deep Learning-based bounding box publishing needed
 $ roslaunch lidar_tracking integration.launch
 $ rosbag play songdo.bag --clock
 ```

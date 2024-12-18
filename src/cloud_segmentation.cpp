@@ -3,7 +3,6 @@
 #include "cloud_segmentation/cloud_segmentation.hpp"
 
 using PointType = PointXYZIT; // hesai
-// using PointType = velodyne_pcl::PointXYZIRT; // velodyne
 
 boost::shared_ptr<PatchWorkpp<PointType>> PatchworkppGroundSeg; // PatchWorkpp
 boost::shared_ptr<CloudSegmentation<PointType>> CloudSegmentation_;

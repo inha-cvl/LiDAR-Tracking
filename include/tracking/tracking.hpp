@@ -77,8 +77,6 @@ private:
     std::vector<std::pair<float, float>> global_path; // Initialization is Public
     int mode;
     float thresh_iou;    // IOU threshold for bounding box integration
-    int number_front_node;
-    int number_back_node;
     double radius; // Minimum distance threshold for HD map cropping
     
     int invisibleCnt;

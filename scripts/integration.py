@@ -44,10 +44,9 @@ map_path = os.path.join(package_path, map_name)
 crop_distance = 80.0
 interp_distance = 2.0
 
+# ioniq
 t_gps_ego = np.array([1.527, 0, 0])
 q_gps_ego = rotate_quaternion_yaw((0, 0, 0, 1), -0.3)
-
-# ioniq
 t_gps_lidar = np.array([1.06, 0, 2.1])
 q_gps_lidar = rotate_quaternion_yaw((0, 0, 0, 1), -1.5)
 
@@ -148,6 +147,7 @@ class Integration:
         speed_marker = create_text_marker(target_frame, "Speed: {:.2f} km/h".format(v*3.6), self.timestamp, Point(0, 0, 3.0), EGO_CAR_COLOR)
         self.pub_ego_speed_marker.publish(speed_marker)
 
+    # integration bag 사용 시
     def novatel_cb2(self, msg):
         timestamp = msg.header.stamp
         x, y, z = pymap3d.geodetic2enu(

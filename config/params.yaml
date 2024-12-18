@@ -18,8 +18,8 @@ Cloud_Segmentation:
   lidar_settings:
     V_SCAN: 64 # Pandar 64 or OT 128
     H_SCAN: 1800
-    ang_res_x: 0.2 # Calculated as 360.0 / H_SCAN
-    ang_res_y: 0.3125 # Calculated as 40.0 / V_SCAN
+    resolution_x: 0.2 # Calculated as 360.0 / H_SCAN
+    resolution_y: 0.3125 # Calculated as 40.0 / V_SCAN
     ang_bottom: 25
 
   crop:
@@ -62,12 +62,12 @@ Cloud_Segmentation:
     adaptive:
       min_size: 10
       max_size: 2000
-      min_tolerance: 0.5 # 0.7 
-      max_tolerance: 1.0 # 1.2
+      min_tolerance: 0.5
+      max_tolerance: 1.0
       max_region_distance: 100
       number_region: 10
-      min_leaf_size: 0.2 # 0.2
-      max_leaf_size: 0.4 # 0.4
+      min_leaf_size: 0.2
+      max_leaf_size: 0.4
       thresh_iou: 0.1
     L_shape_fitting:
       projection_range: 0.3

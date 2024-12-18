@@ -27,8 +27,8 @@ Panels:
     Splitter Ratio: 0.5
   - Class: rviz/Time
     Name: Time
-    SyncMode: 1
-    SyncSource: ""
+    SyncMode: 2
+    SyncSource: Undistorted Cloud
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -5843,22 +5843,22 @@ Visualization Manager:
           Marker Topic: /ego_model
           Name: Ego Car
           Namespaces:
-            {}
+            ego_car: true
           Queue Size: 100
           Value: true
         - Class: rviz/Marker
-          Enabled: true
+          Enabled: false
           Marker Topic: /ego_speed
           Name: Ego Speed
           Namespaces:
             {}
           Queue Size: 100
-          Value: true
+          Value: false
         - Align Bottom: false
           Background Alpha: 0.800000011920929
           Background Color: 0; 0; 0
           Class: jsk_rviz_plugin/OverlayText
-          Enabled: false
+          Enabled: true
           Foreground Alpha: 0.800000011920929
           Foreground Color: 25; 255; 240
           Invert Shadow: false
@@ -5867,7 +5867,7 @@ Visualization Manager:
           Overtake FG Color Properties: false
           Overtake Position Properties: false
           Topic: /car_info
-          Value: false
+          Value: true
           font: DejaVu Sans Mono
           height: 128
           left: 0
@@ -6023,12 +6023,12 @@ Visualization Manager:
           only edge: false
           show coords: false
         - Class: jsk_rviz_plugin/BoundingBoxArray
-          Enabled: true
+          Enabled: false
           Name: Track Box
           Queue Size: 10
           Topic: /mobinha/perception/lidar/track_box
           Unreliable: false
-          Value: true
+          Value: false
           alpha: 0.800000011920929
           color: 239; 41; 41
           coloring: Flat color
@@ -6036,19 +6036,19 @@ Visualization Manager:
           only edge: false
           show coords: false
         - Class: rviz/MarkerArray
-          Enabled: false
+          Enabled: true
           Marker Topic: /mobinha/visualize/visualize/track_model
           Name: Track Model
           Namespaces:
-            {}
+            model: true
           Queue Size: 100
-          Value: false
+          Value: true
         - Class: rviz/MarkerArray
           Enabled: true
           Marker Topic: /mobinha/visualize/visualize/track_text
           Name: Track Text
           Namespaces:
-            {}
+            text: true
           Queue Size: 100
           Value: true
       Enabled: true
@@ -6081,7 +6081,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 40
+      Distance: 26.700275421142578
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
