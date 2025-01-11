@@ -6018,12 +6018,12 @@ Visualization Manager:
           show coords: false
           value threshold: 0
         - Class: jsk_rviz_plugin/BoundingBoxArray
-          Enabled: true
+          Enabled: false
           Name: Deep Box
           Queue Size: 10
           Topic: /deep_box
           Unreliable: false
-          Value: true
+          Value: false
           alpha: 0.800000011920929
           alpha max: 1
           alpha method: flat
@@ -6052,21 +6052,21 @@ Visualization Manager:
           show coords: false
           value threshold: 0
         - Class: rviz/MarkerArray
-          Enabled: false
+          Enabled: true
           Marker Topic: /mobinha/visualize/visualize/track_model
           Name: Track Model
           Namespaces:
             {}
           Queue Size: 100
-          Value: false
+          Value: true
         - Class: rviz/MarkerArray
-          Enabled: false
+          Enabled: true
           Marker Topic: /mobinha/visualize/visualize/track_text
           Name: Track Text
           Namespaces:
             {}
           Queue Size: 100
-          Value: false
+          Value: true
       Enabled: true
       Name: LiDAR
   Enabled: true
