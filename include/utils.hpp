@@ -148,7 +148,7 @@ visualization_msgs::MarkerArray bba2ma(const jsk_recognition_msgs::BoundingBoxAr
         marker.action = visualization_msgs::Marker::ADD;
         marker.pose.position = bbox.pose.position;
 
-        // 1 : Car, 2 : Truck, 3 : Motorcycle
+        // 1 : Car, 2 : Truck or Pedestrian, 3 : Motorcycle
         if (bbox.label == 1)
         {
             marker.type = visualization_msgs::Marker::MESH_RESOURCE;
@@ -166,12 +166,12 @@ visualization_msgs::MarkerArray bba2ma(const jsk_recognition_msgs::BoundingBoxAr
 
         else if (bbox.label == 2)
         {
-            marker.type = visualization_msgs::Marker::SPHERE;
+            marker.type = visualization_msgs::Marker::CYLINDER;
             marker.scale = bbox.dimensions;
             marker.color.r = 0.0;
             marker.color.g = 0.0;
             marker.color.b = 1.0;
-            marker.color.a = 0.0;
+            marker.color.a = 1.0;
         }
         else if (bbox.label == 3)
         {

@@ -38,7 +38,7 @@ Cloud_Segmentation:
       enabled: false
       intensity: 10.0
     crop_hd_map:
-      radius: 1.5
+      radius: 2.0
   
   ground_removal:
     fp_distance: 7.0
