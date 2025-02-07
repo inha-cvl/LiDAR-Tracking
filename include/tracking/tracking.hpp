@@ -156,7 +156,7 @@ void Tracking::integrationBbox(jsk_recognition_msgs::BoundingBoxArray &cluster_b
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
-    saveTimeToFile(integration_time_log_path, time_taken);
+    // saveTimeToFile(integration_time_log_path, time_taken);
 }
 
 void Tracking::cropHDMapBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, 
@@ -207,7 +207,7 @@ void Tracking::cropHDMapBbox(const jsk_recognition_msgs::BoundingBoxArray &input
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
-    saveTimeToFile(crophdmap_time_log_path, time_taken);
+    // saveTimeToFile(crophdmap_time_log_path, time_taken);
 }
 
 void Tracking::tracking(const jsk_recognition_msgs::BoundingBoxArray &bbox_array, 
@@ -231,7 +231,7 @@ void Tracking::tracking(const jsk_recognition_msgs::BoundingBoxArray &bbox_array
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
-    saveTimeToFile(tracking_time_log_path, time_taken);
+    // saveTimeToFile(tracking_time_log_path, time_taken);
 }
 
 void Tracking::transformBbox(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, tf2_ros::Buffer &tf_buffer, 
@@ -268,7 +268,7 @@ void Tracking::transformBbox(const jsk_recognition_msgs::BoundingBoxArray &input
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
-    saveTimeToFile(transform_time_log_path, time_taken);
+    // saveTimeToFile(transform_time_log_path, time_taken);
 }
 
 void Tracking::correctionBboxRelativeSpeed(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, const ros::Time &input_stamp, 
@@ -304,7 +304,7 @@ void Tracking::correctionBboxRelativeSpeed(const jsk_recognition_msgs::BoundingB
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
-    saveTimeToFile(correction_time_log_path, time_taken);
+    // saveTimeToFile(correction_time_log_path, time_taken);
 }
 
 void Tracking::correctionBboxTF(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, const ros::Time &input_stamp, 
@@ -362,58 +362,5 @@ void Tracking::correctionBboxTF(const jsk_recognition_msgs::BoundingBoxArray &in
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
-    saveTimeToFile(correction_time_log_path, time_taken);
+    // saveTimeToFile(correction_time_log_path, time_taken);
 }
-
-
-
-/*
-void Tracking::correctionBboxTF(const jsk_recognition_msgs::BoundingBoxArray &input_bbox_array, const ros::Time &input_stamp, 
-                              const ros::Time &cur_stamp, tf2_ros::Buffer &tf_buffer, 
-                              jsk_recognition_msgs::BoundingBoxArray &output_bbox_array, double& time_taken) 
-{
-    auto start = std::chrono::steady_clock::now();
-
-    output_bbox_array.boxes.clear();
-
-    geometry_msgs::TransformStamped transformStampedAtInput, transformStampedAtStamp;
-
-    try {
-        transformStampedAtStamp = tf_buffer.lookupTransform(world_frame, target_frame, input_stamp);
-        transformStampedAtInput = tf_buffer.lookupTransform(world_frame, target_frame, cur_stamp); // enu -> tf 변환 시 약 0.1초 소요 ros::Time::now() 사용 불가
-    } catch (tf2::TransformException &ex) {
-        output_bbox_array = input_bbox_array;
-        return;
-    }
-
-    tf2::Transform tfAtInput, tfAtStamp, deltaTransform;
-    tf2::fromMsg(transformStampedAtInput.transform, tfAtInput);
-    tf2::fromMsg(transformStampedAtStamp.transform, tfAtStamp);
-
-    deltaTransform = tfAtStamp.inverse() * tfAtInput;
-    // deltaTransform = tfAtInput.inverse() * tfAtStamp;
-    geometry_msgs::TransformStamped deltaTransformStamped;
-    deltaTransformStamped.transform = tf2::toMsg(deltaTransform);
-
-    for (const auto &box : input_bbox_array.boxes) {
-        geometry_msgs::PoseStamped input_pose, transformed_pose;
-
-        input_pose.pose = box.pose;
-        tf2::doTransform(input_pose, transformed_pose, deltaTransformStamped);
-
-        jsk_recognition_msgs::BoundingBox transformed_box;
-        transformed_box.header = box.header;
-        transformed_box.header.stamp = input_stamp;
-        transformed_box.pose = transformed_pose.pose;
-        transformed_box.dimensions = box.dimensions;
-        transformed_box.value = box.value;
-        transformed_box.label = box.label;
-        output_bbox_array.boxes.push_back(transformed_box);
-    }
-
-    auto end = std::chrono::steady_clock::now();
-    std::chrono::duration<double> elapsed_seconds = end - start;
-    time_taken = elapsed_seconds.count();
-    saveTimeToFile(correction_time_log_path, time_taken);
-}
-*/

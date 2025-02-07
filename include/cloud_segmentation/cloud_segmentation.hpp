@@ -59,8 +59,8 @@ public:
         // imu
         imu_cache.setCacheSize(1000);
         last_timestamp_imu = -1;
-        Eigen::Quaterniond q(1, 0, 0, 0);
-        // Eigen::Quaterniond q(Eigen::AngleAxisd(-M_PI / 2, Eigen::Vector3d::UnitX()));
+        // Eigen::Quaterniond q(1, 0, 0, 0);
+        Eigen::Quaterniond q(std::sqrt(2)/2, 0, 0, std::sqrt(2)/2);
         Eigen::Vector3d t(0, 0, 0);
         T_i_l = Sophus::SE3d(q, t);
 
@@ -269,7 +269,7 @@ void CloudSegmentation<PointT>::projectPointCloud(const pcl::PointCloud<PointT>&
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
-    saveTimeToFile(projection_time_log_path, time_taken);
+    // saveTimeToFile(projection_time_log_path, time_taken);
 }
 
 template<typename PointT> inline
@@ -299,7 +299,7 @@ void CloudSegmentation<PointT>::convertPointCloudToImage(const pcl::PointCloud<P
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
-    saveTimeToFile(convert_time_log_path, time_taken);
+    // saveTimeToFile(convert_time_log_path, time_taken);
 }
 
 template<typename PointT> inline
@@ -353,7 +353,7 @@ void CloudSegmentation<PointT>::cropPointCloud(const pcl::PointCloud<PointT>& cl
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
-    saveTimeToFile(crop_time_log_path, time_taken);
+    // saveTimeToFile(crop_time_log_path, time_taken);
 }
 
 template<typename PointT> inline
@@ -426,7 +426,7 @@ void CloudSegmentation<PointT>::cropHDMapPointCloud(const pcl::PointCloud<PointT
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
-    saveTimeToFile(crophdmap_time_log_path, time_taken);
+    // saveTimeToFile(crophdmap_time_log_path, time_taken);
 }
 
 template<typename PointT> inline
@@ -457,11 +457,10 @@ void CloudSegmentation<PointT>::removalGroundPointCloud(const pcl::PointCloud<Po
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
-    saveTimeToFile(removalground_time_log_path, time_taken);
+    // saveTimeToFile(removalground_time_log_path, time_taken);
 }
 
 // hesai
-
 template<typename PointT> inline
 void CloudSegmentation<PointT>::undistortPointCloud(const pcl::PointCloud<PointT>& cloudIn, 
                                                     pcl::PointCloud<PointT>& cloudOut, double &time_taken)
@@ -536,19 +535,8 @@ void CloudSegmentation<PointT>::undistortPointCloud(const pcl::PointCloud<PointT
     auto end_time = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end_time - start_time;
     time_taken = elapsed_seconds.count();
-    saveTimeToFile(undistortion_time_log_path, time_taken);
+    // saveTimeToFile(undistortion_time_log_path, time_taken);
 }
-
-// velodyne time 필드 없음
-/*
-template<typename PointT> inline
-void CloudSegmentation<PointT>::undistortPointCloud(const pcl::PointCloud<PointT>& cloudIn, 
-                                                    pcl::PointCloud<PointT>& cloudOut, double &time_taken)
-{
-    cloudOut = cloudIn;
-}
-*/
-// nuscenes에는 time 있는지 확인 하기
 
 // OpenPCDet
 template<typename PointT> inline
@@ -599,7 +587,7 @@ void CloudSegmentation<PointT>::downsamplingPointCloud(const pcl::PointCloud<Poi
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
-    saveTimeToFile(downsampling_time_log_path, time_taken);
+    // saveTimeToFile(downsampling_time_log_path, time_taken);
 }
 
 template<typename PointT> inline
@@ -685,7 +673,7 @@ void CloudSegmentation<PointT>::adaptiveClustering(const pcl::PointCloud<PointT>
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
     time_taken = elapsed.count();
-    saveTimeToFile(clustering_time_log_path, time_taken);
+    // saveTimeToFile(clustering_time_log_path, time_taken);
 }
 
 template<typename PointT> inline
@@ -715,8 +703,8 @@ void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<Po
         indices_array[region_index].push_back(i);
     }
 
-    double total_downsampling_time = 0.0;
-    double total_clustering_time = 0.0;
+    // double total_downsampling_time = 0.0;
+    // double total_clustering_time = 0.0;
 
     for (int i = 0; i <= number_region; i++) {
         if (indices_array[i].empty()) continue;
@@ -727,9 +715,8 @@ void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<Po
         }
 
         // 복셀화 적용
-        
         if (i != number_region) {
-            auto downsample_start = std::chrono::steady_clock::now();
+            // auto downsample_start = std::chrono::steady_clock::now();
             
             pcl::VoxelGrid<ClusterPointT> voxel_grid_filter;
             float leaf_size = max_leaf_size - (i * (max_leaf_size - min_leaf_size) / (number_region - 1)); 
@@ -740,12 +727,12 @@ void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<Po
             voxel_grid_filter.filter(downsampledCloud);
             cloudSegment = downsampledCloud; 
             
-            auto downsample_end = std::chrono::steady_clock::now();
-            total_downsampling_time += std::chrono::duration<double>(downsample_end - downsample_start).count();
+            // auto downsample_end = std::chrono::steady_clock::now();
+            // total_downsampling_time += std::chrono::duration<double>(downsample_end - downsample_start).count();
         }
         
         // 클러스터링 수행
-        auto clustering_start = std::chrono::steady_clock::now();
+        // auto clustering_start = std::chrono::steady_clock::now();
 
         pcl::search::KdTree<ClusterPointT> tree;
         tree.setInputCloud(boost::make_shared<pcl::PointCloud<ClusterPointT>>(cloudSegment));
@@ -772,12 +759,12 @@ void CloudSegmentation<PointT>::adaptiveVoxelClustering(const pcl::PointCloud<Po
             outputClusters.push_back(cluster);
         }
 
-        auto clustering_end = std::chrono::steady_clock::now();
-        total_clustering_time += std::chrono::duration<double>(clustering_end - clustering_start).count();
+        // auto clustering_end = std::chrono::steady_clock::now();
+        // total_clustering_time += std::chrono::duration<double>(clustering_end - clustering_start).count();
     }
 
-    saveTimeToFile(downsampling_time_log_path, total_downsampling_time);
-    saveTimeToFile(clustering_time_log_path, total_clustering_time);
+    // saveTimeToFile(downsampling_time_log_path, total_downsampling_time);
+    // saveTimeToFile(clustering_time_log_path, total_clustering_time);
 
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed = end - start;
@@ -858,7 +845,7 @@ void CloudSegmentation<PointT>::fittingLShape(const std::vector<pcl::PointCloud<
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
-    saveTimeToFile(lshape_time_log_path, time_taken);
+    // saveTimeToFile(lshape_time_log_path, time_taken);
 }
 
 template<typename PointT> inline
@@ -963,6 +950,5 @@ void CloudSegmentation<PointT>::fittingPCA(const std::vector<pcl::PointCloud<Clu
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     time_taken = elapsed_seconds.count();
-    saveTimeToFile(lshape_time_log_path, time_taken);
+    // saveTimeToFile(lshape_time_log_path, time_taken);
 }
-
