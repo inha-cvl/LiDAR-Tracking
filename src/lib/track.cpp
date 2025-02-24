@@ -374,27 +374,12 @@ pair<jsk_recognition_msgs::BoundingBoxArray, visualization_msgs::MarkerArray> Tr
 	jsk_recognition_msgs::BoundingBoxArray bboxArray;
 	visualization_msgs::MarkerArray textArray;
 	
-	// ros::Time current_time = ros::Time::now(); // motion correction
-
 	for (int i = 0; i < vecTracks.size(); i++)
 	{
 		if (vecTracks[i].age >= 1 && vecTracks[i].cntConsecutiveInvisible == 0)
 		{	
 			vecTracks[i].cur_bbox.header.seq = vecTracks[i].age; // header.seq를 tracking object의 age로 사용
-			vecTracks[i].cur_bbox.value = vecTracks[i].v;
-
-			// motion correction
-			// if (vecTracks[i].age >= m_thres_invisibleCnt) {
-			// 	double c_t = (current_time - vecTracks[i].cur_bbox.header.stamp).toSec();
-
-			// 	if (has_recent_values_same_sign(vecTracks[i].vx_deque, 3)) {
-			// 		vecTracks[i].cur_bbox.pose.position.x += vecTracks[i].vx * c_t;
-			// 	}
-			// 	if (has_recent_values_same_sign(vecTracks[i].vy_deque, 3)) {
-			// 		vecTracks[i].cur_bbox.pose.position.y += vecTracks[i].vy * c_t;
-			// 	}
-			// }
-			
+			vecTracks[i].cur_bbox.value = vecTracks[i].v;			
 			bboxArray.boxes.push_back(vecTracks[i].cur_bbox);
 			textArray.markers.push_back(get_text_msg(vecTracks[i], i));
 		}

@@ -5,7 +5,7 @@
 ros::Publisher pub_track_box, pub_track_text, pub_track_model, pub_track_test;
 
 // Track tracker;
-boost::shared_ptr<Tracking> Tracking_;  // Tracking 클래스의 객체를 boost::shared_ptr로 관리
+boost::shared_ptr<Tracking> Tracking_;
 
 double t9, t10, t11, t12, t13, total;
 std::string fixed_frame;
@@ -25,14 +25,21 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
     if (bba_msg->boxes.empty()) { return; }
 
     cluster_bbox_array = *bba_msg;
+}
+
+void callbackDeep(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
+{
+    if (bba_msg->boxes.empty()) { return; }
+
+    deep_bbox_array = *bba_msg;
 
     Tracking_->integrationBbox(cluster_bbox_array, deep_bbox_array, integration_bbox_array, t9);
     if (checkTransform(tf_buffer, world_frame, target_frame)) {
         Tracking_->transformBbox(integration_bbox_array, tf_buffer, transformed_bbox_array, t10);
-        // Tracking_->cropHDMapBbox(transformed_bbox_array, filtered_bbox_array, bba_msg->header.stamp, t11);
+        Tracking_->cropHDMapBbox(transformed_bbox_array, filtered_bbox_array, bba_msg->header.stamp, t11);
         // Tracking_->correctionBboxTF(track_bbox_array, bba_msg->header.stamp, ros::Time::now(), tf_buffer, corrected_bbox_array, t13);
         fixed_frame = target_frame;
-        output_bbox_array = transformed_bbox_array;
+        output_bbox_array = filtered_bbox_array;
     } else {
         fixed_frame = lidar_frame;
         output_bbox_array = integration_bbox_array;
@@ -40,11 +47,11 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
 
     Tracking_->tracking(output_bbox_array, track_bbox_array, track_text_array, bba_msg->header.stamp, t12);
     publish_stamp = ros::Time::now();
-    // Tracking_->correctionBboxRelativeSpeed(track_bbox_array, bba_msg->header.stamp, publish_stamp, corrected_bbox_array, t13);
+    Tracking_->correctionBboxRelativeSpeed(track_bbox_array, bba_msg->header.stamp, publish_stamp, corrected_bbox_array, t13);
     
     // pub_track_test.publish(bba2msg(filtered_bbox_array, publish_stamp, fixed_frame));
-    pub_track_box.publish(bba2msg(track_bbox_array, publish_stamp, fixed_frame));
-    pub_track_model.publish(bba2ma(track_bbox_array, publish_stamp, fixed_frame));
+    pub_track_box.publish(bba2msg(corrected_bbox_array, publish_stamp, fixed_frame));
+    pub_track_model.publish(bba2ma(corrected_bbox_array, publish_stamp, fixed_frame));
     pub_track_text.publish(ta2msg(track_text_array, publish_stamp, fixed_frame));
 
     total = ros::Time::now().toSec() - cluster_bbox_array.boxes[0].header.stamp.toSec();
@@ -56,14 +63,6 @@ void callbackCluster(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
     // std::cout << "transform : " << t13 << "sec" << std::endl;
     std::cout << "total : " << total << " sec" << std::endl;
     std::cout << "fixed frame : " << fixed_frame << std::endl;
-    
-}
-
-void callbackDeep(const jsk_recognition_msgs::BoundingBoxArray::Ptr &bba_msg)
-{
-    if (bba_msg->boxes.empty()) { return; }
-
-    deep_bbox_array = *bba_msg;
 }
 
 void callbackWaypoints(const sensor_msgs::PointCloud2::Ptr &cloud_msg)

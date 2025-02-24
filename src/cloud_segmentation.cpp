@@ -52,20 +52,14 @@ void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
     CloudSegmentation_->cropPointCloud(fullCloud, cropCloud, t3);
     // pub_crop_cloud.publish(cloud2msg(cropCloud, input_stamp, lidar_frame));
 
-    // CloudSegmentation->cropHDMapPointCloud(cropCloud, groundCloud, tf_buffer, t4);
-    // pub_ground.publish(cloud2msg(groundCloud, input_stamp, lidar_frame));
-
     CloudSegmentation_->removalGroundPointCloud(cropCloud, nonGroundCloud, groundCloud, t4);
-    pub_non_ground.publish(cloud2msg(nonGroundCloud, input_stamp, lidar_frame));
+    // pub_non_ground.publish(cloud2msg(nonGroundCloud, input_stamp, lidar_frame));
     // pub_ground.publish(cloud2msg(groundCloud, input_stamp, lidar_frame));
 
     CloudSegmentation_->undistortPointCloud(nonGroundCloud, undistortionCloud, t5);
     pub_undistortion_cloud.publish(cloud2msg(undistortionCloud, input_stamp, lidar_frame));
 
-    CloudSegmentation_->pcl2FloatArray(undistortionCloud, pointArray, t6);
-    pub_point_array.publish(array2msg(pointArray, input_stamp, lidar_frame));
-
-    CloudSegmentation_->adaptiveVoxelClustering(nonGroundCloud, cluster_array, t7);
+    CloudSegmentation_->adaptiveVoxelClustering(undistortionCloud, cluster_array, t7);
     // pub_cluster_array.publish(cluster2msg(cluster_array, input_stamp, lidar_frame));
     CloudSegmentation_->fittingLShape(cluster_array, cluster_bbox_array, t8);
     pub_cluster_box.publish(bba2msg(cluster_bbox_array, input_stamp, lidar_frame));
@@ -102,7 +96,7 @@ int main(int argc, char**argv) {
     pub_ground      = pnh.advertise<sensor_msgs::PointCloud2>("ground", 1, true);
     pub_non_ground  = pnh.advertise<sensor_msgs::PointCloud2>("nonground", 1, true);
     pub_undistortion_cloud = pnh.advertise<sensor_msgs::PointCloud2>("undistortioncloud", 1, true);
-    pub_point_array = pnh.advertise<std_msgs::Float32MultiArray>("pointarray", 1, true);
+    // pub_point_array = pnh.advertise<std_msgs::Float32MultiArray>("pointarray", 1, true);
     pub_downsampling_cloud  = pnh.advertise<sensor_msgs::PointCloud2>("downsampledcloud", 1, true);
     pub_cluster_array  = pnh.advertise<sensor_msgs::PointCloud2>("cluster_array", 1, true);
     pub_cluster_box = pnh.advertise<jsk_recognition_msgs::BoundingBoxArray>("cluster_box", 1, true);

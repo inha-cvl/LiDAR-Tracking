@@ -2,8 +2,7 @@
 #include <csignal>
 #include "tracking/tracking.hpp"
 
-
-ros::Publisher pub_track_box, pub_track_text, pub_track_model, pub_track_test;
+ros::Publisher pub_track_box, pub_track_text, pub_track_model, pub_track_test, pub_synchronized_cloud;
 
 // Track tracker;
 boost::shared_ptr<Tracking> Tracking_;
@@ -39,22 +38,32 @@ void callbackSynchronized(const jsk_recognition_msgs::BoundingBoxArray::ConstPtr
         output_bbox_array = integration_bbox_array;
     }
 
+    publish_stamp = ros::Time::now();
+
     Tracking_->tracking(output_bbox_array, track_bbox_array, track_text_array, cluster_bba_msg->header.stamp, t12);
     Tracking_->correctionBboxRelativeSpeed(track_bbox_array, cluster_bba_msg->header.stamp, publish_stamp, corrected_bbox_array, t13);
 
-    publish_stamp = ros::Time::now();
-
-    pub_track_box.publish(bba2msg(track_bbox_array, publish_stamp, fixed_frame));
-    pub_track_model.publish(bba2ma(track_bbox_array, publish_stamp, fixed_frame));
+    pub_track_box.publish(bba2msg(corrected_bbox_array, publish_stamp, fixed_frame));
+    pub_track_model.publish(bba2ma(corrected_bbox_array, publish_stamp, fixed_frame));
     pub_track_text.publish(ta2msg(track_text_array, publish_stamp, fixed_frame));
 
-    total = ros::Time::now().toSec() - cluster_bbox_array.header.stamp.toSec();
+    total = ros::Time::now().toSec() - cluster_bba_msg->header.stamp.toSec();
 
     std::cout << "\033[" << 18 << ";" << 30 << "H" << std::endl;
     std::cout << "integration & transform : " << t9 + t10 << " sec" << std::endl;
     std::cout << "tracking : " << t12 << " sec" << std::endl;
     std::cout << "total : " << total << " sec" << std::endl;
     std::cout << "fixed frame : " << fixed_frame << std::endl;
+}
+
+void callbackCloud(const sensor_msgs::PointCloud2::Ptr &cloud_msg)
+{
+    if (cloud_msg->data.empty()) return;
+
+    sensor_msgs::PointCloud2 cloud = *cloud_msg;
+    cloud.header.stamp = ros::Time::now();
+
+    pub_synchronized_cloud.publish(cloud);
 }
 
 int main(int argc, char** argv)
@@ -71,6 +80,7 @@ int main(int argc, char** argv)
     pub_track_box = pnh.advertise<jsk_recognition_msgs::BoundingBoxArray>("/mobinha/perception/lidar/track_box", 1);
     pub_track_text = pnh.advertise<visualization_msgs::MarkerArray>("/mobinha/visualize/visualize/track_text", 1);
     pub_track_model = pnh.advertise<visualization_msgs::MarkerArray>("/mobinha/visualize/visualize/track_model", 1);
+    pub_synchronized_cloud = pnh.advertise<sensor_msgs::PointCloud2>("/cloud_segmentation/synchronized_cloud", 1);
 
     Tracking_ = boost::make_shared<Tracking>(pnh);
 
@@ -79,10 +89,12 @@ int main(int argc, char** argv)
     message_filters::Subscriber<jsk_recognition_msgs::BoundingBoxArray> sub_deep_box(nh, "/deep_box", 1);
 
     typedef message_filters::sync_policies::ApproximateTime<jsk_recognition_msgs::BoundingBoxArray, jsk_recognition_msgs::BoundingBoxArray> SyncPolicy;
-    message_filters::Synchronizer<SyncPolicy> sync(SyncPolicy(1), sub_cluster_box, sub_deep_box);
+    message_filters::Synchronizer<SyncPolicy> sync(SyncPolicy(10), sub_cluster_box, sub_deep_box);
+    sync.setMaxIntervalDuration(ros::Duration(0.05));
     sync.registerCallback(boost::bind(&callbackSynchronized, _1, _2));
 
     ros::Subscriber sub_waypoints = nh.subscribe("/waypoints", 1, &Tracking::updateWaypoints, Tracking_.get());
+    ros::Subscriber sub_cloud = nh.subscribe("/cloud_segmentation/undistortioncloud", 1, callbackCloud);
 
     ros::spin();
     return 0;
