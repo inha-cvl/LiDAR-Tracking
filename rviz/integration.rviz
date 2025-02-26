@@ -28,7 +28,7 @@ Panels:
   - Class: rviz/Time
     Name: Time
     SyncMode: 2
-    SyncSource: Undistorted Cloud
+    SyncSource: Synchronized Cloud
 Preferences:
   PromptSaveOnExit: true
 Toolbars:

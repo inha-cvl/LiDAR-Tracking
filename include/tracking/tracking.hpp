@@ -217,6 +217,7 @@ void Tracking::tracking(const jsk_recognition_msgs::BoundingBoxArray &bbox_array
     auto start = std::chrono::steady_clock::now();
 
     track_bbox_array.boxes.clear();
+    track_bbox_array.header.stamp = input_stamp;
     track_text_array.markers.clear();
     tracker.predictNewLocationOfTracks(input_stamp);
     tracker.assignDetectionsTracks(bbox_array);
